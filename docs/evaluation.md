@@ -2,6 +2,10 @@
 
 Use a local disposable instance and synthetic records for this walkthrough. It exercises individual sign-in, service-desk work and read-only review. OpenService is an evaluation foundation; the [compatibility ledger](servicenow-compatibility.md) records what remains before production adoption.
 
+## Evaluation boundary
+
+This walkthrough is milestone M0 in the [adoption roadmap](roadmap.md#milestones-and-exit-gates). It is suitable for feature feedback on synthetic data. It does not establish a self-service onboarding flow, safely scoped multi-person operation or readiness for real customer/employee data. Before offering a managed shared evaluation, complete M1 identity/invite/revocation/access/delivery gates; before an operational pilot, record the evaluator-specific requirements and satisfy M2. The existing manual account steps below remain the current behavior, not the target onboarding design.
+
 ## Start the workspace
 
 Follow [Run locally](../README.md#run-locally), then open http://localhost:8090 and sign in as `admin` with the generated password from your private `.env`. The default listener is local to your computer. Each evaluator can run their own copy; a shared hosted instance needs separately configured access and HTTPS.

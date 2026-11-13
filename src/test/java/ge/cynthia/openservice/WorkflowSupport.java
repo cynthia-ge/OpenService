@@ -679,6 +679,7 @@ abstract class WorkflowSupport {
         String parent = add("incident").get("sys_id").toString();
         try (var db = store.open()) {
             db.update("ALTER TABLE os_attachment DROP COLUMN content_type");
+            db.update("DROP TABLE os_migration"); // Simulate the pre-migration installation.
             db.update(
                     "INSERT INTO os_attachment(sys_id,record_id,name,content) VALUES(?,?,?,?)",
                     "legacy-attachment",

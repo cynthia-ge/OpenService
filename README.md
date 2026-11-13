@@ -2,6 +2,8 @@
 
 A service operations foundation for Cynthia: clear workspaces, shared records, controlled workflows and a practical path from ServiceNow exports.
 
+Development priorities and adoption gates are defined in the [roadmap and build order](docs/roadmap.md). Identity, invitations, account lifecycle and access isolation are the next prerequisites. The current build supports a disposable local walkthrough with synthetic data; shared evaluation and operational pilot gates remain unmet.
+
 ## Screenshots
 
 Captured from the Java application in automated Chromium tests with synthetic evaluation data. These are working screens, not design mockups.
@@ -101,7 +103,7 @@ Terraform is unchanged by this migration; its separate provider validation and m
 
 ## Operational scope
 
-Cloud configurations provide HTTPS; secure cookies are enabled outside the loopback Docker demo. Each deployment starts with a single application instance with embedded Tomcat. PostgreSQL locks protect record updates; optional `If-Match` revisions prevent lost updates. Schema creation is an initial bootstrap, not an upgrade migration system. Coordinate upgrades with a database backup and downtime until versioned migrations are added.
+Cloud configurations provide HTTPS; secure cookies are enabled outside the loopback Docker demo. Each deployment starts with a single application instance with embedded Tomcat. PostgreSQL locks protect record updates; optional `If-Match` revisions prevent lost updates. Startup applies ordered transactional upgrades with a migration journal and serialized schema changes. Follow the [upgrade procedure](docs/platform-foundations.md#ordered-database-upgrades-adopt-02-os-026), using a database backup and planned downtime; rolling upgrades and restore targets remain unverified.
 
 SSO, granular ACL/domain isolation, rate limiting, malware scanning, background workers, email delivery, business-rule scripts and high availability are not implemented. Treat this version as a local evaluation foundation, not a hardened production service. Licensed under the [MIT License](LICENSE), preserving the licence already selected in the Cynthia GitHub repository.
 

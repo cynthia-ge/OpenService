@@ -10,7 +10,7 @@ Target: a bounded subset of the **Australia Table API documentation**, accessed 
 | OS-002 | A1 | Shared schema and persistence | Partial: registry drives validation and forms. No native sys_db_object/sys_dictionary CRUD, table inheritance or typed reference resolution. |
 | OS-003 | A2 | Workspaces, forms, lists | Implemented original UI: overview, record forms, search, paging, dictionary, history and migration. No native UI16/g_form compatibility. |
 | OS-004 | A4(d) | Encoded queries | Partial: equality, inequality, contains/not-contains, starts-with, ends-with, IN/NOT IN, empty/not-empty, AND and ordering; database filtering. No full grammar or scripting. |
-| OS-005 | A2/A4(e) | Identity and access | Partial: local admin/agent/reader, administrator account-onboarding workspace, Basic and session auth, CSRF. No password reset/deactivation, OAuth/SSO, field ACLs or domain separation. |
+| OS-005 | A2/A4(e) | Identity and access | Partial: local admin/agent/reader, administrator account-onboarding workspace, Basic and session auth, CSRF. No invites/email verification, account editing/reset/deactivation, OAuth/SSO, field ACLs or domain separation. |
 | OS-006 | A3 | Incident/change/request/problem workflows | Partial: local state machines, approval by admin, revision checks. Not verified vendor state/BR semantics. |
 | OS-007 | A1/A4(a) | Audit, journal and files | Partial: persistent record events, internal notes and attachments. Attachment upload/read/delete APIs; no native journal API or full activity semantics. |
 | OS-008 | Recommendations | Migration/import/export | Implemented bounded JSON/CSV path with dry-run, source retention, stable IDs and repeat-import skips. See migration limits. |
@@ -19,8 +19,12 @@ Target: a bounded subset of the **Australia Table API documentation**, accessed 
 | OS-011 | A1/A4(c) | Business rules and Glide runtime | Missing; prioritize a sandboxed, explicitly scoped implementation with source-backed semantics. |
 | OS-012 | A4(a) | Aggregate, native attachments, Import Set and Batch APIs | Partial: filtered/grouped count Aggregate API added; attachment upload/read/delete supported; numeric aggregates, attachment updates, Import Set and Batch remain missing. |
 | OS-013 | A1/A5 | Flow Designer, SLAs, catalog, update sets | Missing; no placeholder interfaces claim support. |
-| OS-014 | Enterprise operation | SSO, fine-grained ACLs, rate limits, workers, migrations | Missing; required before production adoption. |
+| OS-014 | Enterprise operation | SSO, fine-grained ACLs, rate limits, workers, migrations | Partial: serialized versioned database upgrades; SSO, granular ACLs, rate limits and workers remain missing. |
 | OS-015 | Migration | Direct connector, attachments, journals, differential sync | Missing; next adoption-focused tranche. |
+
+## Build priorities
+
+The [adoption roadmap](roadmap.md) controls implementation order. OS-005/009/014 identity, membership and access prerequisites, supported by migration and reliable-delivery foundations, take priority over optional API extensions. ADOPT-01 through ADOPT-19 make the previously broad identity, operational, governance and service-workflow gaps explicit; their statuses and milestone gates are separate from compatibility and code coverage. Ready P0 work should be selected first in future development cycles.
 
 ## Acceptance gates
 
@@ -117,3 +121,7 @@ Implemented bounded slice, blueprint A4(a). Australia Table API sysparm_no_count
 ## OS-025 — Stable attachment metadata ordering
 
 Implemented bounded slice, blueprint A4(a). Australia Attachment API list documentation supports ORDERBY/ORDERBYDESC terms in sysparm_query. OpenService supports its four existing identifier/name filter fields and adds sys_id as a stable tie breaker. The new populated-list regression failed with 400 before implementation. Both database suites verify ascending/descending filenames, duplicate-name stable ties, multi-key table/name ordering, ID and parent-ID ordering, mixed equality filters, sorting before offset/limit, empty pages, rejected unknown/empty/injected/malformed fields, duplicate parameters and authentication. Mutation counts remain unchanged. Final Java 27 Docker/PostgreSQL acceptance verifies packaging, readiness, persistent records and attachment bytes after container replacement, versioned routes, new query/header behavior and audited deletion. Ordering is limited to sys_id, file_name, table_name and table_sys_id. It does not add size/content ordering, full Table query grammar, attachment updates or vendor-instance conformance. Exact acceptance/coverage and QA base are recorded in [cycle 10](iteration-log.md).
+
+## OS-026 — Serialized versioned schema upgrades
+
+Implemented original OpenService persistence slice, blueprint A1 and platform operations, ADOPT-02. Startup serializes schema/bootstrap changes and journals ordered transactional upgrades. Fresh, legacy and previously upgraded databases retain records and credentials; concurrent starts do not race; failed upgrades roll back; unknown or inconsistent histories reject startup. PostgreSQL metadata is scoped to the current schema. This is a local operational contract, not a ServiceNow database/runtime compatibility claim. See [contract, sources and QA evidence](platform-foundations.md).
