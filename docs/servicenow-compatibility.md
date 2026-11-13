@@ -129,3 +129,7 @@ Implemented original OpenService persistence slice, blueprint A1 and platform op
 ## OS-027 — Persistent user identities
 
 Implemented local identity slice, ADOPT-03 / blueprint A1/A4(e): migration backfills stable unique IDs, new/bootstrap accounts receive IDs, sessions bind to identities, and the authenticated current-account API exposes only ID/name/role. Credentials, existing create-account responses and historic actor names are preserved. No native sys_user, membership, recovery or record-isolation parity is claimed. See [cycle 2 evidence and sources](platform-foundations.md).
+
+## OS-028 — Persistent browser-session revocation
+
+Implemented local ADOPT-05/08 slice: persistent authentication revisions, next-request invalidation of all caller browser sessions, self-service UI/API for every role, CSRF protection and fresh-login recovery. No individual-session directory, account lockout, SSO or ServiceNow session API parity is claimed. See [cycle 3](platform-foundations.md).

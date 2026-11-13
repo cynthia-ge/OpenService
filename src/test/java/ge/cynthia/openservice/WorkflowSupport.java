@@ -36,12 +36,68 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void revocationInvalidatesAllBrowserSessionsButPreservesCredentials() throws Exception {
+        account("SessionReader", "reader");
+        login("SessionReader");
+        var first = client;
+        try (var second =
+                HttpClient.newBuilder()
+                        .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
+                        .build()) {
+            client = second;
+            login("SessionReader");
+            assertEquals(200, get("/account", null).statusCode());
+            assertEquals(
+                    200,
+                    json(
+                                    "POST",
+                                    "/api/openservice/me/sessions/revoke",
+                                    map(),
+                                    auth("SessionReader"))
+                            .statusCode());
+            assertEquals(401, get("/api/openservice/me", null).statusCode());
+            client = first;
+            assertEquals(401, get("/api/openservice/me", null).statusCode());
+            assertEquals(302, get("/account", null).statusCode());
+            assertEquals(200, get("/api/openservice/me", auth("SessionReader")).statusCode());
+            new Store(environment);
+            assertEquals(401, get("/api/openservice/me", null).statusCode());
+            String token = login("SessionReader");
+            assertEquals(
+                    403, form("/account/sessions/revoke", map("csrf", "bad"), null).statusCode());
+            assertEquals(200, get("/api/openservice/me", null).statusCode());
+            assertEquals(
+                    302, form("/account/sessions/revoke", map("csrf", token), null).statusCode());
+            assertEquals(401, get("/api/openservice/me", null).statusCode());
+            login("SessionReader");
+            assertEquals(200, get("/account", null).statusCode());
+        } finally {
+            client = first;
+        }
+        assertEquals(405, get("/api/openservice/me/sessions/revoke", auth("admin")).statusCode());
+        assertEquals(
+                400,
+                json(
+                                "POST",
+                                "/api/openservice/me/sessions/revoke",
+                                map("user_id", "other"),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                400,
+                json("POST", "/api/openservice/me/sessions/revoke?user=other", map(), auth("admin"))
+                        .statusCode());
+        assertEquals(400, get("/account?user=other", auth("admin")).statusCode());
+        assertEquals(405, json("POST", "/account", map(), auth("admin")).statusCode());
+    }
+
+    @Test
     void stableCurrentIdentityIsPrivatePersistentAndSessionBound() throws Exception {
         assertEquals(401, get("/api/openservice/me", null).statusCode());
         try (var db = store.open()) {
             db.update(
                     "INSERT INTO os_user(name,password,role)"
-                        + " VALUES('LegacyWriter','unusable','reader')");
+                            + " VALUES('LegacyWriter','unusable','reader')");
             db.connection.commit();
         }
         assertEquals(

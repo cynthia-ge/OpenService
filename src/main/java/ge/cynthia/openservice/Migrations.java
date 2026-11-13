@@ -4,7 +4,7 @@ import java.sql.SQLException;
 
 /** Ordered, transactional upgrades. The caller commits schema and bootstrap data together. */
 final class Migrations {
-    static final int VERSION = 2;
+    static final int VERSION = 3;
 
     private Migrations() {}
 
@@ -41,6 +41,12 @@ final class Migrations {
             db.update("CREATE UNIQUE INDEX IF NOT EXISTS ix_os_user_identity ON os_user(user_id)");
             db.update(
                     "INSERT INTO os_migration(version,name) VALUES(2,?)", "stable user identities");
+        }
+        if (version < 3) {
+            addColumn(db, "os_user", "auth_revision", "BIGINT NOT NULL DEFAULT 0");
+            db.update(
+                    "INSERT INTO os_migration(version,name) VALUES(3,?)",
+                    "revocable browser sessions");
         }
     }
 

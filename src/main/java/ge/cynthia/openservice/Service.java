@@ -409,6 +409,10 @@ public final class Service {
         return result;
     }
 
+    public static void revokeSessions(Store.Db db, String userId) throws SQLException {
+        db.update("UPDATE os_user SET auth_revision=auth_revision+1 WHERE user_id=?", userId);
+    }
+
     public static Map<String, Object> createAccount(Store.Db db, Object body) throws Exception {
         var value = object(body);
         if (!value.keySet().equals(Set.of("name", "password", "role")))

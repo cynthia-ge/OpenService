@@ -122,7 +122,7 @@ class MigrationsTest {
                                     .get("password");
             db.update("DROP INDEX ix_os_user_identity");
             db.update("ALTER TABLE os_user DROP COLUMN user_id");
-            db.update("DELETE FROM os_migration WHERE version=2");
+            db.update("DELETE FROM os_migration WHERE version>=2");
             db.update("INSERT INTO os_user(name,password,role) VALUES('legacy',?,'reader')", hash);
             db.connection.commit();
         }

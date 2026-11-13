@@ -115,6 +115,10 @@ public class WebController {
                             : db.one(
                                     "SELECT * FROM os_user WHERE user_id=?",
                                     session.getAttribute("user"));
+            if (user != null
+                    && !Objects.equals(
+                            session.getAttribute("auth_revision"),
+                            ((Number) user.get("auth_revision")).longValue())) user = null;
             String authorization = request.getHeader("Authorization");
             if (!publicPath && authorization != null && !authorization.isEmpty())
                 user = authenticate(db, authorization);
@@ -131,8 +135,12 @@ public class WebController {
                             Objects.toString(
                                     request.getHeader("X-CSRF-Token"),
                                     context.parameter("csrf", "")));
-                if (context.role().equals("reader") && !path.equals("/logout"))
-                    throw new Failure(403, "Read-only account");
+                if (context.role().equals("reader")
+                        && !Set.of(
+                                        "/logout",
+                                        "/account/sessions/revoke",
+                                        "/api/openservice/me/sessions/revoke")
+                                .contains(path)) throw new Failure(403, "Read-only account");
             }
             var result = route(context, path, method.equals("HEAD") ? "GET" : method);
             if (result.getStatus() != null && result.getStatus().value() >= 400)
@@ -241,6 +249,8 @@ public class WebController {
                 c.http.changeSessionId();
                 Collections.list(c.session.getAttributeNames()).forEach(c.session::removeAttribute);
                 c.session.setAttribute("user", user.get("user_id"));
+                c.session.setAttribute(
+                        "auth_revision", ((Number) user.get("auth_revision")).longValue());
                 c.session.setAttribute("csrf", csrf());
                 return redirect("/");
             }
@@ -250,6 +260,23 @@ public class WebController {
             method(method, "POST");
             c.session.invalidate();
             return redirect("/login");
+        }
+        if (path.equals("/account")) {
+            method(method, "GET");
+            c.noQuery();
+            return view(c, "account", map("table", "account"));
+        }
+        if (Set.of("/account/sessions/revoke", "/api/openservice/me/sessions/revoke")
+                .contains(path)) {
+            method(method, "POST");
+            c.noQuery();
+            c.uniqueQuery();
+            boolean api = path.startsWith("/api/");
+            if (api && !object(body(c)).isEmpty())
+                throw new Failure(400, "Provide an empty JSON object");
+            Service.revokeSessions(c.db, c.user.get("user_id").toString());
+            c.session.invalidate();
+            return api ? json(map("result", map("revoked", true)), 200) : redirect("/login");
         }
         Matcher collection = Pattern.compile("/api/now/(?:v[12]/)?table/([^/]+)").matcher(path);
         if (collection.matches()) {

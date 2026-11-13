@@ -62,6 +62,7 @@ class ControllerBoundaryTest {
                             db.one("SELECT user_id FROM os_user WHERE name='admin'")
                                     .get("user_id"));
         }
+        empty.getSession().setAttribute("auth_revision", 0L);
         empty.addHeader("X-CSRF-Token", "known-csrf");
         empty.setContentType("application/json");
         empty.setContent(

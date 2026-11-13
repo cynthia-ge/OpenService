@@ -48,6 +48,44 @@ class BrowserTest {
     }
 
     @Test
+    void readerCanSignOutAllBrowsersFromAccountSecurity() throws Exception {
+        String name = "SecurityReader" + id().substring(0, 8);
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db, map("name", name, "password", WorkflowSupport.PASSWORD, "role", "reader"));
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var first = browser.newContext();
+                var second = browser.newContext()) {
+            var one = first.newPage();
+            var two = second.newPage();
+            login(one, name);
+            login(two, name);
+            one.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName("Account security"))
+                    .click();
+            one.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Sign out all browsers"))
+                    .click();
+            one.waitForURL("**/login");
+            two.navigate(base() + "/account");
+            two.waitForURL("**/login");
+            login(two, name);
+            two.navigate(base() + "/account");
+            two.setViewportSize(390, 844);
+            assertTrue(
+                    (Boolean) two.evaluate("document.documentElement.scrollWidth <= innerWidth"));
+            assertTrue(
+                    two.getByRole(
+                                    AriaRole.HEADING,
+                                    new Page.GetByRoleOptions().setName("Account security"))
+                            .isVisible());
+        }
+    }
+
+    @Test
     void accountOnboardingRecordLifecycleMigrationAndResponsiveLayout() throws Exception {
         try (var db = store.open()) {
             for (String table : List.of("os_attachment", "os_event", "os_record"))

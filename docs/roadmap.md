@@ -108,3 +108,5 @@ Security verification planning should use a versioned [OWASP ASVS](https://asvs.
 The [platform implementation contract](platform-foundations.md) records the provisional ADOPT-01 permission matrix, ordered ADOPT-02 upgrades, per-cycle acceptance and QA evidence. The initial assessment above is retained as the starting snapshot. ADOPT-02 now has a migration journal and startup serialization; backup restoration and upgrade recovery procedures still need operational drills. All M1–M3 gates remain unmet.
 
 ADOPT-03 now includes stable user identities, migration/backfill, session binding and a current-account API. Memberships, profiles/email and lifecycle controls remain open; this does not complete ADOPT-03 or M1. See platform cycle 2.
+
+ADOPT-05/08 now include persistent all-browser session revocation and an account-security page. Account deactivation, role changes, password management, rate limits and absolute session lifetime remain open. See platform cycle 3.
