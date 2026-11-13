@@ -47,7 +47,8 @@ abstract class ContractSupport {
 
     void replay(Map<String, Object> test) throws Exception {
         try (var db = store.open()) {
-            for (String table : List.of("os_attachment", "os_event", "os_record"))
+            for (String table :
+                    List.of("os_attachment", "os_event", "os_record", "os_auth_attempt"))
                 db.update("DELETE FROM " + table);
             db.update("DELETE FROM os_user WHERE name<>?", "admin");
             if (db.postgres) {

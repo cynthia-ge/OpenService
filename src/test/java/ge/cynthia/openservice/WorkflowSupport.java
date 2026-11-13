@@ -37,9 +37,139 @@ abstract class WorkflowSupport {
                             "os_invitation",
                             "os_recovery",
                             "os_record_access",
-                            "os_group_member")) db.update("DELETE FROM " + table);
+                            "os_group_member",
+                            "os_auth_attempt")) db.update("DELETE FROM " + table);
             db.update("DELETE FROM os_user WHERE name<>?", "admin");
             db.connection.commit();
+        }
+    }
+
+    @Test
+    void authenticationThrottleIsDurableSharedBoundedAndAutomaticallyExpires() throws Exception {
+        account("ThrottledUser", "agent");
+        String csrf = login("ThrottledUser"),
+                key = Passwords.tokenHash("ThrottledUser"),
+                api = "/api/openservice/me";
+        String bad =
+                "Basic "
+                        + Base64.getEncoder()
+                                .encodeToString(
+                                        "ThrottledUser:incorrect".getBytes(StandardCharsets.UTF_8));
+        assertEquals(
+                403,
+                form("/login", map("username", "ThrottledUser", "password", "incorrect"), null)
+                        .statusCode());
+        for (int i = 0; i < 3; i++) assertEquals(401, get(api, bad).statusCode());
+        for (int i = 0; i < 2; i++)
+            assertEquals(
+                    401,
+                    form(
+                                    "/login",
+                                    map(
+                                            "username",
+                                            "ThrottledUser",
+                                            "password",
+                                            "incorrect",
+                                            "csrf",
+                                            csrf),
+                                    null)
+                            .statusCode());
+        long expires;
+        try (var db = store.open()) {
+            var row = db.one("SELECT * FROM os_auth_attempt WHERE identity_hash=?", key);
+            assertEquals(5, ((Number) row.get("failures")).intValue());
+            expires = ((Number) row.get("expires_at")).longValue();
+            assertFalse(row.toString().contains("ThrottledUser"));
+        }
+        new Store(environment);
+        var denied = get(api, auth("ThrottledUser"));
+        assertEquals(429, denied.statusCode());
+        assertEquals("300", denied.headers().firstValue("Retry-After").orElseThrow());
+        assertEquals(
+                429,
+                form(
+                                "/login",
+                                map(
+                                        "username",
+                                        "ThrottledUser",
+                                        "password",
+                                        PASSWORD,
+                                        "csrf",
+                                        csrf),
+                                null)
+                        .statusCode());
+        assertEquals(200, get(api, null).statusCode());
+        assertEquals(200, get(api, auth("admin")).statusCode());
+        try (var db = store.open()) {
+            assertEquals(
+                    expires,
+                    ((Number)
+                                    db.one(
+                                                    "SELECT expires_at FROM os_auth_attempt WHERE"
+                                                        + " identity_hash=?",
+                                                    key)
+                                            .get("expires_at"))
+                            .longValue());
+            db.update("UPDATE os_auth_attempt SET expires_at=0 WHERE identity_hash=?", key);
+            db.connection.commit();
+        }
+        assertEquals(200, get(api, auth("ThrottledUser")).statusCode());
+        assertEquals(401, get(api, bad).statusCode());
+        assertEquals(200, get(api, auth("ThrottledUser")).statusCode());
+        try (var db = store.open()) {
+            assertEquals(
+                    0, db.count("SELECT COUNT(*) FROM os_auth_attempt WHERE identity_hash=?", key));
+            db.update(
+                    "INSERT INTO os_auth_attempt VALUES(?,4,?)",
+                    key,
+                    System.currentTimeMillis() + 300000L);
+            db.connection.commit();
+        }
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var results = new ArrayList<java.util.concurrent.Future<Integer>>();
+            for (int i = 0; i < 6; i++)
+                results.add(executor.submit(() -> get(api, bad).statusCode()));
+            var statuses = new ArrayList<Integer>();
+            for (var result : results) statuses.add(result.get());
+            assertEquals(1, Collections.frequency(statuses, 401));
+            assertEquals(5, Collections.frequency(statuses, 429));
+        }
+        String unknown =
+                "Basic "
+                        + Base64.getEncoder()
+                                .encodeToString(
+                                        "NoSuchAccount:incorrect".getBytes(StandardCharsets.UTF_8));
+        for (int i = 0; i < 5; i++) assertEquals(401, get(api, unknown).statusCode());
+        assertEquals(429, get(api, unknown).statusCode());
+        String tooLong =
+                "Basic "
+                        + Base64.getEncoder()
+                                .encodeToString(
+                                        ("LongAttempt:" + "x".repeat(1025))
+                                                .getBytes(StandardCharsets.UTF_8));
+        assertEquals(401, get(api, tooLong).statusCode());
+        try (var db = store.open()) {
+            db.update("DELETE FROM os_auth_attempt");
+            try (var insert = db.statement("INSERT INTO os_auth_attempt VALUES(?,1,?)")) {
+                for (int i = 0; i < 4096; i++) {
+                    insert.setString(1, String.format(Locale.ROOT, "%064x", i));
+                    insert.setLong(2, System.currentTimeMillis() + 300000L);
+                    insert.addBatch();
+                }
+                insert.executeBatch();
+            }
+            db.connection.commit();
+        }
+        assertEquals(200, get(api, auth("admin")).statusCode());
+        assertEquals(429, get(api, unknown).statusCode());
+        try (var db = store.open()) {
+            assertEquals(4096, db.count("SELECT COUNT(*) FROM os_auth_attempt"));
+            db.update("UPDATE os_auth_attempt SET expires_at=0");
+            db.connection.commit();
+        }
+        assertEquals(200, get(api, auth("ThrottledUser")).statusCode());
+        try (var db = store.open()) {
+            assertEquals(0, db.count("SELECT COUNT(*) FROM os_auth_attempt"));
         }
     }
 

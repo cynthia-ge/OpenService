@@ -48,6 +48,52 @@ class BrowserTest {
     }
 
     @Test
+    void browserExplainsTemporaryLoginThrottlingAndAllowsLoginAfterExpiry() throws Exception {
+        String name = "ThrottleBrowser" + id().substring(0, 8);
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db, map("name", name, "role", "reader", "password", WorkflowSupport.PASSWORD));
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var context = browser.newContext()) {
+            var page = context.newPage();
+            for (int i = 0; i < 6; i++) {
+                page.navigate(base() + "/login");
+                page.getByLabel("Username", new Page.GetByLabelOptions().setExact(true)).fill(name);
+                page.getByLabel("Password", new Page.GetByLabelOptions().setExact(true))
+                        .fill("incorrect");
+                var response =
+                        page.waitForResponse(
+                                rsp ->
+                                        rsp.url().endsWith("/login")
+                                                && rsp.request().method().equals("POST"),
+                                () ->
+                                        page.getByRole(
+                                                        AriaRole.BUTTON,
+                                                        new Page.GetByRoleOptions()
+                                                                .setName("Enter your workspace"))
+                                                .click());
+                assertEquals(i < 5 ? 401 : 429, response.status());
+            }
+            page.getByText(
+                            "Too many sign-in attempts. Try again in five minutes.",
+                            new Page.GetByTextOptions().setExact(true))
+                    .waitFor();
+            try (var db = store.open()) {
+                db.update(
+                        "UPDATE os_auth_attempt SET expires_at=0 WHERE identity_hash=?",
+                        Passwords.tokenHash(name));
+                db.connection.commit();
+            }
+            login(page, name);
+            page.setViewportSize(390, 844);
+            assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth<=innerWidth"));
+        }
+    }
+
+    @Test
     void groupVisibilityChangesTakeEffectInAnAlreadySignedInBrowser() throws Exception {
         String name = "TeamBrowser" + id().substring(0, 8), group, record;
         try (var db = store.open()) {

@@ -173,3 +173,7 @@ Implemented local ADOPT-03 slice: administrator roster, add/remove, persistence,
 ## OS-038 — Group-restricted record visibility
 
 Implemented local ADOPT-06 slice: administrator policy selection, current-membership enforcement, revocation and fail-closed group deletion. Australia contextual-security concepts inform this behavior; programmable ACLs and inherited roles remain missing. See [cycle 13](platform-foundations.md) for acceptance and exact counters.
+
+## OS-039 — Persistent password-attempt throttling
+
+Implemented local ADOPT-08 slice: browser and Basic limits, durable counters, fixed automatic expiry, concurrent enforcement and bounded storage. Local fixed-window behavior differs from the vendor's configurable lockout scripts. See [cycle 14](platform-foundations.md) for evidence and exact counters.

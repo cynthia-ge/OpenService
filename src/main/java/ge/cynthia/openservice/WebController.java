@@ -165,6 +165,7 @@ public class WebController {
         } catch (Failure error) {
             db.connection.rollback();
             response.setStatus(error.status);
+            if (error.status == 429) response.setHeader("Retry-After", "300");
             if (error.status == 401)
                 response.setHeader("WWW-Authenticate", "Basic realm=\"OpenService\"");
             if (request.getRequestURI().startsWith("/api/"))
@@ -191,11 +192,9 @@ public class WebController {
                                     Base64.getDecoder().decode(header.substring(6)),
                                     StandardCharsets.UTF_8)
                             .split(":", 2);
-            var user = db.one("SELECT * FROM os_user WHERE name=? AND active=1", pair[0]);
-            if (pair.length != 2
-                    || user == null
-                    || !Passwords.matches((String) user.get("password"), pair[1]))
-                throw new Failure(401, "Invalid credentials");
+            if (pair.length != 2) throw new Failure(401, "Invalid credentials");
+            var user = Authentication.verify(db, pair[0], pair[1]);
+            if (user == null) throw new Failure(401, "Invalid credentials");
             return user;
         } catch (IllegalArgumentException error) {
             throw new Failure(401, "Invalid credentials");
@@ -316,13 +315,9 @@ public class WebController {
             if (method.equals("POST")) {
                 checkCsrf(c, c.parameter("csrf", ""));
                 var user =
-                        c.db.one(
-                                "SELECT * FROM os_user WHERE name=? AND active=1",
-                                c.parameter("username", ""));
-                if (user == null
-                        || !Passwords.matches(
-                                (String) user.get("password"), c.parameter("password", "")))
-                    throw new Failure(401, "Incorrect username or password");
+                        Authentication.verify(
+                                c.db, c.parameter("username", ""), c.parameter("password", ""));
+                if (user == null) throw new Failure(401, "Incorrect username or password");
                 c.http.changeSessionId();
                 Collections.list(c.session.getAttributeNames()).forEach(c.session::removeAttribute);
                 c.session.setAttribute("user", user.get("user_id"));
