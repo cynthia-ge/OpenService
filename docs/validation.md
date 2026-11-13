@@ -1,12 +1,12 @@
 # Java 27 validation — 13 November 2026
 
-`JAVA_HOME=<Temurin 27.0.1.0.2+1> ./mvnw clean verify` passes **266 JUnit tests**, with zero failures, errors or skipped tests. Spring Boot 4.1.2 and Maven 3.9.16 are pinned. Exact JaCoCo totals: **1122/1122 lines, 616/616 branch outcomes, 89/89 methods**.
+`JAVA_HOME=<Temurin 27.0.1.0.2+1> ./mvnw clean verify` passes **268 JUnit tests**, with zero failures, errors or skipped tests. Spring Boot 4.1.2 and Maven 3.9.16 are pinned. Exact JaCoCo totals: **1125/1125 lines, 616/616 branch outcomes, 89/89 methods**.
 
 | Production source | Lines | Branch outcomes | Methods |
 |---|---:|---:|---:|
 | `Application.java` | 8/8 | 8/8 | 2/2 |
 | `Passwords.java` | 33/33 | 28/28 | 5/5 |
-| `Service.java` | 346/346 | 212/212 | 26/26 |
+| `Service.java` | 349/349 | 212/212 | 26/26 |
 | `Setup.java` | 19/19 | 4/4 | 1/1 |
 | `Store.java` | 89/89 | 52/52 | 10/10 |
 | `Values.java` | 15/15 | 4/4 | 8/8 |

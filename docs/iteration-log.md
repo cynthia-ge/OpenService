@@ -91,3 +91,15 @@ QA round 1: reviewed parser alternatives, SQL null/text semantics on both databa
 Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 266 tests pass, no skipped tests. Exact feature gate: `Service.java`: 346/346 lines, 212/212 branches, 26/26 methods. Whole Java application: 1122/1122 lines, 616/616 branch outcomes, 89/89 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Service.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
 
 Stored-value predicates only; no display-value resolution, reference traversal, OR grammar or native scripting is added. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.
+
+## Cycle 6: OS-021 — Literal ENDSWITH filtering
+
+Fixed QA base: `35c89df8656ac61c6ce9bf861598b237fcfb8088`; branch `main`, clean starting tree. Blueprint A4(d). Australia string operator reference defines ENDSWITH as matching a stored suffix. The new real HTTP regression failed with unsupported-query 400 before implementation. OpenService reuses bound, escaped LIKE-family SQL rather than interpreting user wildcard characters.
+
+SQLite/PostgreSQL Table and Aggregate cases verify ordinary suffixes versus prefixes/middle text, percent/underscore/backslash literals, injection-shaped quote strings, Unicode, empty operands, null exclusion, system fields, AND/order composition, pagination, counts and invalid fields/operator rejection.
+
+QA round 1: reviewed operator parsing, wildcard placement, escaping and binding, empty/null handling, shared Table/Aggregate callers, tests and documentation. No new/reopened findings or repairs; required checks pass. Unresolved: none.
+
+Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 268 tests pass, no skipped tests. Exact feature gate: `Service.java`: 349/349 lines, 212/212 branches, 26/26 methods. Whole Java application: 1125/1125 lines, 616/616 branch outcomes, 89/89 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Service.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
+
+Existing database LIKE comparison policy is retained: SQLite default ASCII-insensitive behavior differs from PostgreSQL case-sensitive behavior. No vendor collation, reference/display-value or full encoded-query parity is claimed. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.

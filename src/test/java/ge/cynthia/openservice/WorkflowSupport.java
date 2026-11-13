@@ -1192,4 +1192,78 @@ abstract class WorkflowSupport {
                                 .statusCode(),
                         query);
     }
+
+    List<String> textQueryFixtures() throws Exception {
+        var ids = new ArrayList<String>();
+        var values =
+                List.of(
+                        "alpha-tail",
+                        "tail-middle",
+                        "prefix%_\\end",
+                        "prefixXX\\end",
+                        "x' OR '1'='1",
+                        "",
+                        "prefix-é尾",
+                        "placeholder");
+        for (int i = 0; i < values.size(); i++) {
+            var created =
+                    json(
+                            "POST",
+                            "/api/now/table/incident",
+                            map(
+                                    "short_description",
+                                    i + " text query",
+                                    "assigned_to",
+                                    values.get(i)),
+                            auth("admin"));
+            assertEquals(201, created.statusCode());
+            ids.add(object(parsed(created).get("result")).get("sys_id").toString());
+        }
+        try (var db = store.open()) {
+            var nil = Service.record(db, "incident", ids.get(7));
+            object(nil.get("data")).put("assigned_to", null);
+            Service.save(db, nil);
+            db.connection.commit();
+        }
+        return ids;
+    }
+
+    @Test
+    void endsWithMatchesLiteralSuffixesBeforePagingAndCounts() throws Exception {
+        var ids = textQueryFixtures();
+        for (var pair : Map.of("tail", 0, "%_\\end", 2, "x' OR '1'='1", 4, "é尾", 6).entrySet()) {
+            String query = "assigned_toENDSWITH" + pair.getKey();
+            assertEquals(
+                    List.of(ids.get(pair.getValue())),
+                    tableQuery(query, "").stream().map(r -> r.get("sys_id")).toList());
+            countQuery(query, 1);
+        }
+        assertEquals(
+                List.of(ids.get(0)),
+                tableQuery(
+                                "assigned_toENDSWITHtail^priority=3^ORDERBYshort_description",
+                                "&sysparm_limit=1")
+                        .stream()
+                        .map(r -> r.get("sys_id"))
+                        .toList());
+        assertEquals(List.of(), tableQuery("assigned_toENDSWITHtail", "&sysparm_offset=1"));
+        assertEquals(
+                ids.subList(0, 7),
+                tableQuery("assigned_toENDSWITH^ORDERBYshort_description", "").stream()
+                        .map(r -> r.get("sys_id"))
+                        .toList());
+        countQuery("assigned_toENDSWITH", 7);
+        assertEquals(
+                ids.getFirst(),
+                tableQuery("sys_idENDSWITH" + ids.getFirst(), "").getFirst().get("sys_id"));
+        for (String query : List.of("unknownENDSWITHtail", "assigned_toENDWITHtail"))
+            for (String endpoint :
+                    List.of(
+                            "/api/now/table/incident?",
+                            "/api/now/stats/incident?sysparm_count=true&"))
+                assertEquals(
+                        400,
+                        get(endpoint + "sysparm_query=" + encoded(query), auth("admin"))
+                                .statusCode());
+    }
 }

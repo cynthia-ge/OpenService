@@ -275,8 +275,8 @@ public final class Service {
             }
             Matcher match =
                     Pattern.compile(
-                                    "([a-z_][a-z_0-9]*)(!=|=|LIKE|STARTSWITH|NOT"
-                                        + " IN|IN|ISEMPTY|ISNOTEMPTY)(.*)",
+                                    "([a-z_][a-z_0-9]*)(!=|=|LIKE|STARTSWITH|ENDSWITH|NOT"
+                                            + " IN|IN|ISEMPTY|ISNOTEMPTY)(.*)",
                                     Pattern.DOTALL)
                             .matcher(term);
             if (!match.matches() || !columns.containsKey(match.group(1)))
@@ -304,9 +304,12 @@ public final class Service {
                         .append(String.join(",", Collections.nCopies(members.size(), "?")))
                         .append(')');
                 values.addAll(members);
-            } else if (op.equals("LIKE") || op.equals("STARTSWITH")) {
+            } else if (Set.of("LIKE", "STARTSWITH", "ENDSWITH").contains(op)) {
                 where.append(" AND ").append(column).append(" LIKE ? ESCAPE '\\'");
-                values.add((op.equals("LIKE") ? "%" : "") + escaped(value) + "%");
+                values.add(
+                        (op.equals("STARTSWITH") ? "" : "%")
+                                + escaped(value)
+                                + (op.equals("ENDSWITH") ? "" : "%"));
             } else {
                 where.append(" AND ").append(column).append(op).append('?');
                 values.add(value);
