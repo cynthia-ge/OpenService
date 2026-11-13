@@ -111,6 +111,252 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void privateHandoverRollsBackAndSerializesConcurrentRequests() throws Exception {
+        account("ConcurrentOld", "reader");
+        account("ConcurrentNew", "reader");
+        String old, next, actor, record;
+        try (var db = store.open()) {
+            old = RecordAccess.owner(db, "ConcurrentOld");
+            next = RecordAccess.owner(db, "ConcurrentNew");
+            actor = RecordAccess.owner(db, "admin");
+            var item =
+                    Service.create(
+                            db,
+                            "incident",
+                            map("short_description", "Concurrent private record"),
+                            "admin");
+            record = item.get("sys_id").toString();
+            RecordAccess.change(db, item, actor, map("visibility", "private", "owner_id", old));
+            db.connection.commit();
+        }
+        try (var db = store.open()) {
+            PrivateRecords.transfer(db, actor, old, map("new_owner_id", next));
+        }
+        try (var db = store.open()) {
+            assertEquals(old, RecordAccess.status(db, record).get("owner_id"));
+            assertEquals(
+                    0,
+                    db.count(
+                            "SELECT COUNT(*) FROM os_security_event WHERE"
+                                + " action='account.private_records_transferred'"));
+        }
+        String api = "/api/openservice/users/" + old + "/private-records/transfer";
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var a =
+                    executor.submit(
+                            () -> json("POST", api, map("new_owner_id", next), auth("admin")));
+            var b =
+                    executor.submit(
+                            () -> json("POST", api, map("new_owner_id", next), auth("admin")));
+            var first = a.get();
+            var second = b.get();
+            assertEquals(200, first.statusCode());
+            assertEquals(200, second.statusCode());
+            assertEquals(
+                    1,
+                    ((Number) object(parsed(first).get("result")).get("transferred_count"))
+                                    .intValue()
+                            + ((Number)
+                                            object(parsed(second).get("result"))
+                                                    .get("transferred_count"))
+                                    .intValue());
+        }
+        try (var db = store.open()) {
+            assertEquals(
+                    1,
+                    db.count(
+                            "SELECT COUNT(*) FROM os_security_event WHERE"
+                                + " action='account.private_records_transferred'"));
+            assertEquals(next, RecordAccess.status(db, record).get("owner_id"));
+        }
+    }
+
+    @Test
+    void privateRecordHandoverPreservesHistoryAndEnforcesTheNewOwner() throws Exception {
+        account("OldOwner", "reader");
+        account("NewOwner", "reader");
+        account("OtherOwner", "agent");
+        String old =
+                object(parsed(get("/api/openservice/me", auth("OldOwner"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String next =
+                object(parsed(get("/api/openservice/me", auth("NewOwner"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String other =
+                object(parsed(get("/api/openservice/me", auth("OtherOwner"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String api = "/api/openservice/users/" + old + "/private-records/transfer";
+        assertEquals(200, json("POST", api, map("new_owner_id", next), auth("admin")).statusCode());
+        String first = add("incident").get("sys_id").toString(),
+                second = add("problem").get("sys_id").toString(),
+                deleted = add("incident").get("sys_id").toString();
+        String unrelated = add("incident").get("sys_id").toString(),
+                workspace = add("incident").get("sys_id").toString();
+        String group = add("sys_user_group").get("sys_id").toString(),
+                groupRecord = add("incident").get("sys_id").toString();
+        for (String id : List.of(first, second, deleted, unrelated)) {
+            String table = id.equals(second) ? "problem" : "incident";
+            assertEquals(
+                    200,
+                    json(
+                                    "PATCH",
+                                    "/api/openservice/access/" + table + "/" + id,
+                                    map(
+                                            "visibility",
+                                            "private",
+                                            "owner_id",
+                                            id.equals(unrelated) ? other : old),
+                                    auth("admin"))
+                            .statusCode());
+        }
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/access/incident/" + groupRecord,
+                                map("visibility", "group", "group_id", group),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                204,
+                json("DELETE", "/api/now/table/incident/" + deleted, map(), auth("admin"))
+                        .statusCode());
+        assertEquals(
+                302,
+                upload(
+                                "/record/incident/" + first + "/attachment",
+                                "handover.bin",
+                                new byte[] {8, 7, 6},
+                                auth("admin"))
+                        .statusCode());
+        String file =
+                objects(parsed(get("/api/now/attachment", auth("admin"))).get("result"))
+                        .getFirst()
+                        .get("sys_id")
+                        .toString();
+        assertEquals(401, json("POST", api, map("new_owner_id", next), null).statusCode());
+        for (String actor : List.of("OldOwner", "OtherOwner"))
+            assertEquals(
+                    403, json("POST", api, map("new_owner_id", next), auth(actor)).statusCode());
+        assertEquals(405, get(api, auth("admin")).statusCode());
+        assertEquals(
+                400,
+                json("POST", api + "?x=1", map("new_owner_id", next), auth("admin")).statusCode());
+        assertEquals(
+                404,
+                json(
+                                "POST",
+                                api.replace(old, "0".repeat(32)),
+                                map("new_owner_id", next),
+                                auth("admin"))
+                        .statusCode());
+        for (Object bad :
+                List.of(
+                        map(),
+                        map("new_owner_id", 3),
+                        map("new_owner_id", ""),
+                        map("new_owner_id", "\u0000"),
+                        map("new_owner_id", "0".repeat(32)),
+                        map("new_owner_id", old),
+                        map("new_owner_id", next, "extra", true)))
+            assertEquals(400, json("POST", api, bad, auth("admin")).statusCode());
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + next + "/status",
+                                map("active", false),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(400, json("POST", api, map("new_owner_id", next), auth("admin")).statusCode());
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + next + "/status",
+                                map("active", true),
+                                auth("admin"))
+                        .statusCode());
+        // The handover succeeds even after the departing account has been deactivated.
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + old + "/status",
+                                map("active", false),
+                                auth("admin"))
+                        .statusCode());
+        var before = parsed(get("/api/now/table/incident/" + first, auth("admin"))).get("result");
+        var result =
+                object(
+                        parsed(json("POST", api, map("new_owner_id", next), auth("admin")))
+                                .get("result"));
+        assertEquals(2, result.get("transferred_count"));
+        assertEquals(Set.of(first, second), new HashSet<>((List<String>) result.get("record_ids")));
+        assertEquals(next, result.get("new_owner_id"));
+        assertEquals(
+                before,
+                parsed(get("/api/now/table/incident/" + first, auth("admin"))).get("result"));
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + old + "/status",
+                                map("active", true),
+                                auth("admin"))
+                        .statusCode());
+        for (String id : List.of(first, second)) {
+            String table = id.equals(second) ? "problem" : "incident";
+            assertEquals(
+                    404, get("/api/now/table/" + table + "/" + id, auth("OldOwner")).statusCode());
+            assertEquals(
+                    200, get("/api/now/table/" + table + "/" + id, auth("NewOwner")).statusCode());
+        }
+        assertEquals(404, get("/attachment/" + file, auth("OldOwner")).statusCode());
+        assertArrayEquals(
+                new byte[] {8, 7, 6}, get("/attachment/" + file, auth("NewOwner")).body());
+        assertEquals(
+                200, get("/api/now/table/incident/" + unrelated, auth("OtherOwner")).statusCode());
+        assertEquals(
+                404, get("/api/now/table/incident/" + unrelated, auth("NewOwner")).statusCode());
+        assertEquals(
+                200, get("/api/now/table/incident/" + workspace, auth("OldOwner")).statusCode());
+        assertEquals(
+                404, get("/api/now/table/incident/" + groupRecord, auth("NewOwner")).statusCode());
+        new Store(environment);
+        assertEquals(
+                0,
+                object(
+                                parsed(json("POST", api, map("new_owner_id", next), auth("admin")))
+                                        .get("result"))
+                        .get("transferred_count"));
+        try (var db = store.open()) {
+            assertEquals(old, RecordAccess.status(db, deleted).get("owner_id"));
+            var events =
+                    db.all(
+                            "SELECT * FROM os_security_event WHERE"
+                                + " action='account.private_records_transferred'");
+            assertEquals(1, events.size());
+            assertEquals(old, events.getFirst().get("target_id"));
+            assertEquals(RecordAccess.owner(db, "admin"), events.getFirst().get("actor_id"));
+            assertEquals(result, events.getFirst().get("detail"));
+        }
+        String page = "/admin/accounts/" + next + "/private-records/transfer";
+        String csrf = login("admin");
+        assertEquals(403, form(page, map("new_owner", "OldOwner"), null).statusCode());
+        for (String invalid : List.of("", "bad name", "\u0000", "MissingPerson"))
+            assertEquals(
+                    400, form(page, map("csrf", csrf, "new_owner", invalid), null).statusCode());
+        assertEquals(
+                302, form(page, map("csrf", csrf, "new_owner", "OldOwner"), null).statusCode());
+        assertEquals(200, get("/api/now/table/incident/" + first, auth("OldOwner")).statusCode());
+        assertEquals(404, get("/api/now/table/incident/" + first, auth("NewOwner")).statusCode());
+    }
+
+    @Test
     void accountMembershipRemovalIsAtomicAuditedAndEffectiveForExistingSessions() throws Exception {
         account("DepartingMember", "reader");
         account("RetainedMember", "agent");

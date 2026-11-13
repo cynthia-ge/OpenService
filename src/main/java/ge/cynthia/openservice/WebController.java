@@ -670,6 +670,34 @@ public class WebController {
                     ? json(map("result", map("revoked", true)), 200)
                     : redirect("/admin/accounts/" + recoveryRevoke.group(1));
         }
+        Matcher transferPrivate =
+                Pattern.compile(
+                                "/(?:admin/accounts|api/openservice/users)/([0-9a-f]{32})/private-records/transfer")
+                        .matcher(path);
+        if (transferPrivate.matches()) {
+            method(method, "POST");
+            c.admin();
+            c.noQuery();
+            c.uniqueQuery();
+            boolean api = path.startsWith("/api/");
+            Object input;
+            if (api) input = body(c);
+            else {
+                String name = c.parameter("new_owner", "");
+                if (!name.matches("[A-Za-z0-9]{1,80}"))
+                    throw new Failure(400, "Choose an active account username");
+                input = map("new_owner_id", RecordAccess.owner(c.db, name));
+            }
+            var result =
+                    PrivateRecords.transfer(
+                            c.db,
+                            c.user.get("user_id").toString(),
+                            transferPrivate.group(1),
+                            input);
+            return api
+                    ? json(map("result", result), 200)
+                    : redirect("/admin/accounts/" + transferPrivate.group(1));
+        }
         Matcher accountMemberships =
                 Pattern.compile("/api/openservice/users/([0-9a-f]{32})/memberships").matcher(path);
         if (accountMemberships.matches()) {
@@ -1104,6 +1132,8 @@ public class WebController {
                                 error,
                                 "roles",
                                 Service.ROLES,
+                                "privateCount",
+                                PrivateRecords.count(c.db, id),
                                 "memberships",
                                 GroupMembers.forUser(c.db, id),
                                 "recovery",

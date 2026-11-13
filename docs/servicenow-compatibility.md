@@ -197,3 +197,7 @@ Implemented local ADOPT-04/05 correction: derived invalidated/unavailable states
 ## OS-044 — Account group-access review and removal
 
 Implemented local ADOPT-03/05/06/09 slice: per-account group review and atomic bulk membership withdrawal with security audit and request-time enforcement. Vendor group-removal workflows inform this local extension; inherited group roles and complete deprovisioning are not implemented. See [cycle 19](platform-foundations.md).
+
+## OS-045 — Private-record access handover
+
+Implemented local ADOPT-05/06/09 slice: atomic administrative handover of live private-record access, including parent-governed attachments, with rollback/concurrency/security evidence. Original record attribution and business assignments remain unchanged. Deleted-record audit policies and other visibility modes are excluded. This is a local extension, not vendor offboarding or task reassignment parity. See [cycle 20](platform-foundations.md).

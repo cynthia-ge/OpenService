@@ -48,6 +48,63 @@ class BrowserTest {
     }
 
     @Test
+    void administratorHandsPrivateWorkToAnotherSignedInAccount() throws Exception {
+        String suffix = id().substring(0, 8),
+                oldName = "OldBrowser" + suffix,
+                newName = "NewBrowser" + suffix,
+                user,
+                record;
+        try (var db = store.open()) {
+            for (String name : List.of(oldName, newName))
+                Service.createAccount(
+                        db,
+                        map("name", name, "role", "reader", "password", WorkflowSupport.PASSWORD));
+            user = RecordAccess.owner(db, oldName);
+            var item =
+                    Service.create(
+                            db,
+                            "incident",
+                            map("short_description", "Private handover browser"),
+                            "admin");
+            record = item.get("sys_id").toString();
+            RecordAccess.change(
+                    db,
+                    item,
+                    RecordAccess.owner(db, "admin"),
+                    map("visibility", "private", "owner_id", user));
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var adminContext = browser.newContext();
+                var oldContext = browser.newContext();
+                var newContext = browser.newContext()) {
+            var admin = adminContext.newPage();
+            var old = oldContext.newPage();
+            var next = newContext.newPage();
+            login(admin, "admin");
+            login(old, oldName);
+            login(next, newName);
+            assertEquals(200, old.navigate(base() + "/record/incident/" + record).status());
+            assertEquals(404, next.navigate(base() + "/record/incident/" + record).status());
+            admin.navigate(base() + "/admin/accounts/" + user);
+            assertTrue(admin.locator("main").innerText().contains("1 live private records"));
+            admin.getByLabel("New private owner username").fill(newName);
+            admin.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions()
+                                    .setName("Transfer all live private records"))
+                    .click();
+            assertTrue(admin.locator("main").innerText().contains("0 live private records"));
+            assertEquals(404, old.navigate(base() + "/record/incident/" + record).status());
+            assertEquals(200, next.navigate(base() + "/record/incident/" + record).status());
+            admin.setViewportSize(390, 844);
+            assertTrue(
+                    (Boolean) admin.evaluate("document.documentElement.scrollWidth<=innerWidth"));
+        }
+    }
+
+    @Test
     void administratorOffboardsGroupMembershipsFromAnAccount() throws Exception {
         String name = "OffboardBrowser" + id().substring(0, 8), user, record;
         try (var db = store.open()) {
