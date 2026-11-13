@@ -29,11 +29,231 @@ abstract class WorkflowSupport {
                         .build();
         try (var db = store.open()) {
             for (String table :
-                    List.of("os_attachment", "os_event", "os_record", "os_security_event"))
-                db.update("DELETE FROM " + table);
+                    List.of(
+                            "os_attachment",
+                            "os_event",
+                            "os_record",
+                            "os_security_event",
+                            "os_invitation")) db.update("DELETE FROM " + table);
             db.update("DELETE FROM os_user WHERE name<>?", "admin");
             db.connection.commit();
         }
+    }
+
+    @Test
+    void invitationsSupportRecipientPasswordsExpiryRevocationAndPrivateTokens() throws Exception {
+        String api = "/api/openservice/invitations";
+        assertTrue(objects(parsed(get(api, auth("admin"))).get("result")).isEmpty());
+        account("InviteReader", "reader");
+        account("InviteAgent", "agent");
+        assertEquals(403, get(api, auth("InviteReader")).statusCode());
+        assertEquals(403, get("/admin/invitations", auth("InviteAgent")).statusCode());
+        assertEquals(
+                403,
+                json("POST", api, map("name", "No", "role", "reader"), auth("InviteAgent"))
+                        .statusCode());
+        for (Object bad :
+                List.of(
+                        List.of(),
+                        map(),
+                        map("name", 1, "role", "reader"),
+                        map("name", "bad name", "role", "reader"),
+                        map("name", "A", "role", "owner"),
+                        map("name", "admin", "role", "reader")))
+            assertEquals(400, json("POST", api, bad, auth("admin")).statusCode());
+        assertEquals(400, get(api + "?extra=1", auth("admin")).statusCode());
+        assertEquals(405, json("DELETE", api, map(), auth("admin")).statusCode());
+        var response =
+                json("POST", api, map("name", "InvitedUser", "role", "reader"), auth("admin"));
+        assertEquals(201, response.statusCode());
+        var issued = object(parsed(response).get("result"));
+        String path = issued.get("accept_path").toString(),
+                token = path.substring("/join/".length()),
+                id = issued.get("invite_id").toString();
+        assertEquals(32, token.length());
+        assertEquals("pending", issued.get("state"));
+        assertFalse(html(get(api, auth("admin"))).contains(token));
+        try (var db = store.open()) {
+            var row = db.one("SELECT * FROM os_invitation WHERE invite_id=?", id);
+            assertEquals(Passwords.tokenHash(token), row.get("token_hash"));
+            assertFalse(row.toString().contains(token));
+        }
+        var page = get(path, null);
+        assertEquals(200, page.statusCode());
+        assertEquals("no-referrer", page.headers().firstValue("Referrer-Policy").orElseThrow());
+        assertEquals("no-store", page.headers().firstValue("Cache-Control").orElseThrow());
+        assertTrue(html(page).contains("InvitedUser"));
+        String csrf = csrf(page);
+        assertEquals(403, form(path, map("password", PASSWORD), null).statusCode());
+        assertEquals(400, form(path, map("password", "short", "csrf", csrf), null).statusCode());
+        assertEquals(400, get(path + "?next=evil", null).statusCode());
+        assertEquals(405, json("PUT", path, map(), null).statusCode());
+        new Store(environment);
+        assertEquals(302, form(path, map("password", PASSWORD, "csrf", csrf), null).statusCode());
+        assertEquals(401, get("/api/openservice/me", null).statusCode());
+        assertEquals(400, get(path, null).statusCode());
+        assertEquals(
+                409, json("POST", api + "/" + id + "/revoke", map(), auth("admin")).statusCode());
+        login("InvitedUser");
+        assertEquals(
+                "reader",
+                object(parsed(get("/api/openservice/me", null)).get("result")).get("role"));
+        assertEquals(
+                403,
+                json(
+                                "POST",
+                                "/api/now/table/incident",
+                                map("short_description", "denied"),
+                                auth("InvitedUser"))
+                        .statusCode());
+        var events =
+                objects(
+                        parsed(get("/api/openservice/security-events", auth("admin")))
+                                .get("result"));
+        assertEquals("account.invitation_accepted", events.get(0).get("action"));
+        assertFalse(JSON.writeValueAsString(events).contains(token));
+        var first =
+                object(
+                        parsed(
+                                        json(
+                                                "POST",
+                                                api,
+                                                map("name", "ReplaceInvite", "role", "agent"),
+                                                auth("admin")))
+                                .get("result"));
+        var replacement =
+                object(
+                        parsed(
+                                        json(
+                                                "POST",
+                                                api,
+                                                map("name", "ReplaceInvite", "role", "reader"),
+                                                auth("admin")))
+                                .get("result"));
+        assertNotEquals(first.get("accept_path"), replacement.get("accept_path"));
+        assertEquals(400, get(first.get("accept_path").toString(), null).statusCode());
+        assertEquals(200, get(replacement.get("accept_path").toString(), null).statusCode());
+        String revoke = api + "/" + replacement.get("invite_id") + "/revoke";
+        assertEquals(403, json("POST", revoke, map(), auth("InviteReader")).statusCode());
+        assertEquals(400, json("POST", revoke, map("extra", 1), auth("admin")).statusCode());
+        assertEquals(405, get(revoke, auth("admin")).statusCode());
+        assertEquals(200, json("POST", revoke, map(), auth("admin")).statusCode());
+        assertEquals(200, json("POST", revoke, map(), auth("admin")).statusCode());
+        assertEquals(400, get(replacement.get("accept_path").toString(), null).statusCode());
+        assertEquals(
+                404,
+                json("POST", api + "/" + "f".repeat(32) + "/revoke", map(), auth("admin"))
+                        .statusCode());
+        var expired =
+                object(
+                        parsed(
+                                        json(
+                                                "POST",
+                                                api,
+                                                map("name", "ExpiredInvite", "role", "reader"),
+                                                auth("admin")))
+                                .get("result"));
+        try (var db = store.open()) {
+            db.update(
+                    "UPDATE os_invitation SET expires_at=0 WHERE invite_id=?",
+                    expired.get("invite_id"));
+            db.connection.commit();
+        }
+        assertEquals(400, get(expired.get("accept_path").toString(), null).statusCode());
+        assertEquals(
+                "expired",
+                objects(parsed(get(api, auth("admin"))).get("result")).get(0).get("state"));
+        account("Inviter", "admin");
+        var removed =
+                object(
+                        parsed(
+                                        json(
+                                                "POST",
+                                                api,
+                                                map("name", "RemovedIssuer", "role", "reader"),
+                                                auth("Inviter")))
+                                .get("result"));
+        String inviter =
+                object(parsed(get("/api/openservice/me", auth("Inviter"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + inviter + "/role",
+                                map("role", "reader"),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(400, get(removed.get("accept_path").toString(), null).statusCode());
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + inviter + "/role",
+                                map("role", "admin"),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(400, get(removed.get("accept_path").toString(), null).statusCode());
+        var inactiveIssuer =
+                object(
+                        parsed(
+                                        json(
+                                                "POST",
+                                                api,
+                                                map("name", "InactiveIssuer", "role", "reader"),
+                                                auth("Inviter")))
+                                .get("result"));
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + inviter + "/status",
+                                map("active", false),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(400, get(inactiveIssuer.get("accept_path").toString(), null).statusCode());
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + inviter + "/status",
+                                map("active", true),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(400, get(inactiveIssuer.get("accept_path").toString(), null).statusCode());
+        assertEquals(400, get("/join/" + "x".repeat(32), null).statusCode());
+        String adminCsrf = login("admin");
+        assertEquals(403, form("/admin/invitations", map("name", "UiInvite"), null).statusCode());
+        assertEquals(
+                400,
+                form("/admin/invitations", map("name", "bad name", "csrf", adminCsrf), null)
+                        .statusCode());
+        var created = form("/admin/invitations", map("name", "UiInvite", "csrf", adminCsrf), null);
+        assertEquals(201, created.statusCode());
+        assertTrue(html(created).contains("Invitation acceptance link"));
+        var latest = objects(parsed(get(api, auth("admin"))).get("result")).get(0);
+        assertEquals(
+                302,
+                form(
+                                "/admin/invitations/" + latest.get("invite_id") + "/revoke",
+                                map("csrf", adminCsrf),
+                                null)
+                        .statusCode());
+        assertEquals(200, get("/admin/invitations", null).statusCode());
+        try (var db = store.open()) {
+            String actor =
+                    db.one("SELECT user_id FROM os_user WHERE name='admin'")
+                            .get("user_id")
+                            .toString();
+            for (int n = 0; n < 101; n++)
+                Invitations.issue(db, actor, map("name", "BatchInvite" + n, "role", "reader"));
+            db.connection.commit();
+        }
+        var bounded = objects(parsed(get(api, auth("admin"))).get("result"));
+        assertEquals(100, bounded.size());
+        assertEquals("BatchInvite100", bounded.get(0).get("name"));
+        assertEquals("BatchInvite1", bounded.get(99).get("name"));
     }
 
     @Test

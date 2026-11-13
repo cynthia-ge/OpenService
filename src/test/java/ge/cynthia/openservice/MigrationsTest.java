@@ -43,6 +43,59 @@ class MigrationsTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    void onlyOneConcurrentInvitationAcceptanceCreatesAnAccount(boolean postgres) throws Exception {
+        var store = new Store(configuration(postgres));
+        String token;
+        try (var db = store.open()) {
+            String actor =
+                    db.one("SELECT user_id FROM os_user WHERE name='admin'")
+                            .get("user_id")
+                            .toString();
+            token =
+                    Invitations.issue(
+                                    db,
+                                    actor,
+                                    Values.map("name", "ConcurrentInvite", "role", "agent"))
+                            .get("accept_path")
+                            .toString()
+                            .substring(6);
+            db.connection.commit();
+        }
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var start = new CountDownLatch(1);
+            List<Future<Integer>> results = new ArrayList<>();
+            for (int n = 0; n < 2; n++)
+                results.add(
+                        executor.submit(() -> {
+                            start.await();
+                            try (var db = store.open()) {
+                                try {
+                                    Invitations.accept(db, token, "invitation-test-password");
+                                    db.connection.commit();
+                                    return 200;
+                                } catch (Values.Failure failure) {
+                                    db.connection.rollback();
+                                    return failure.status;
+                                }
+                            }
+                        }));
+            start.countDown();
+            var statuses =
+                    List.of(
+                            results.get(0).get(30, TimeUnit.SECONDS),
+                            results.get(1).get(30, TimeUnit.SECONDS));
+            assertEquals(1, statuses.stream().filter(status -> status == 200).count());
+            assertEquals(1, statuses.stream().filter(status -> status == 400).count());
+        }
+        try (var db = store.open()) {
+            assertEquals(1, db.count("SELECT COUNT(*) FROM os_user WHERE name='ConcurrentInvite'"));
+            assertEquals(1, db.count("SELECT COUNT(*) FROM os_invitation WHERE state='accepted'"));
+            assertEquals(2, db.count("SELECT COUNT(*) FROM os_security_event"));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void concurrentPasswordChangesCannotReuseThePreviousSecret(boolean postgres) throws Exception {
         var store = new Store(configuration(postgres));
         String id;

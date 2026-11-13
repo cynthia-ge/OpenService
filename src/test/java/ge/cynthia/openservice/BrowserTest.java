@@ -48,6 +48,62 @@ class BrowserTest {
     }
 
     @Test
+    void administratorInvitesAndRecipientChoosesTheirOwnPassword() throws Exception {
+        String name = "InvitedBrowser" + id().substring(0, 8);
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var adminContext = browser.newContext();
+                var recipientContext = browser.newContext()) {
+            var admin = adminContext.newPage();
+            var recipient = recipientContext.newPage();
+            login(admin, "admin");
+            admin.getByRole(
+                            AriaRole.LINK,
+                            new Page.GetByRoleOptions().setName("Invitations").setExact(true))
+                    .click();
+            admin.getByLabel("Invited username").fill(name);
+            admin.getByLabel("Invited role").selectOption("reader");
+            admin.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Create invitation"))
+                    .click();
+            String path =
+                    admin.getByRole(
+                                    AriaRole.LINK,
+                                    new Page.GetByRoleOptions()
+                                            .setName("Invitation acceptance link"))
+                            .getAttribute("href");
+            recipient.navigate(base() + path);
+            recipient.getByLabel("Choose your password").fill(WorkflowSupport.PASSWORD);
+            recipient
+                    .getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Accept invitation"))
+                    .click();
+            recipient.waitForURL("**/login");
+            login(recipient, name);
+            assertTrue(
+                    recipient
+                            .request()
+                            .get(base() + "/api/openservice/me")
+                            .text()
+                            .contains("\"role\":\"reader\""));
+            admin.navigate(base() + "/admin/invitations");
+            assertTrue(admin.getByRole(AriaRole.TABLE).innerText().contains("accepted"));
+            assertEquals(
+                    0,
+                    admin.getByRole(
+                                    AriaRole.LINK,
+                                    new Page.GetByRoleOptions()
+                                            .setName("Invitation acceptance link"))
+                            .count());
+            admin.setViewportSize(390, 844);
+            assertTrue(
+                    (Boolean) admin.evaluate("document.documentElement.scrollWidth <= innerWidth"));
+        }
+    }
+
+    @Test
     void readerChangesPasswordAndSignsInWithTheNewSecret() throws Exception {
         String name = "PasswordBrowser" + id().substring(0, 8), next = "browser-changed-password";
         try (var db = store.open()) {

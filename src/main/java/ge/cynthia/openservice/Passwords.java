@@ -20,6 +20,13 @@ public final class Passwords {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
     }
 
+    public static String tokenHash(String token) throws GeneralSecurityException {
+        return HexFormat.of()
+                .formatHex(
+                        MessageDigest.getInstance("SHA-256")
+                                .digest(token.getBytes(StandardCharsets.UTF_8)));
+    }
+
     public static String hash(String password) throws GeneralSecurityException {
         String salt = token();
         return "pbkdf2:sha256:600000$"

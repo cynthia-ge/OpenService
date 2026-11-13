@@ -153,3 +153,7 @@ Implemented local ADOPT-09 slice: transactionally persisted successful account c
 ## OS-033 — Absolute browser-session expiration
 
 Implemented local ADOPT-08 slice: server-side authentication age, an exclusive eight-hour cutoff, invalidation and fresh-login recovery, plus explicit servlet idle configuration. Eight hours is a local policy and does not claim ServiceNow property/default parity. See [cycle 8](platform-foundations.md).
+
+## OS-034 — Manual invitation onboarding
+
+Implemented local ADOPT-04 slice: administrator UI/API issuance/revocation, hashed expiring bearer tokens, issuer-revision binding, CSRF-protected recipient password setup, atomic single-use acceptance and sanitized journals. Vendor application-specific invitation semantics, email delivery, address verification and scoped membership are not claimed. See [cycle 9](platform-foundations.md).

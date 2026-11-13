@@ -89,6 +89,7 @@ public class WebController {
     public ModelAndView dispatch(HttpServletRequest request, HttpServletResponse response)
             throws Exception {
         response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Referrer-Policy", "no-referrer");
         response.setHeader("X-Content-Type-Options", "nosniff");
         response.setHeader(
                 "Content-Security-Policy",
@@ -108,7 +109,9 @@ public class WebController {
             if (request.getContentLengthLong() > 6 * 1024 * 1024)
                 throw new Failure(413, "Request exceeds 6 MB");
             String path = request.getRequestURI(), method = request.getMethod();
-            boolean publicPath = Set.of("/healthz", "/login", "/static/app.css").contains(path);
+            boolean publicPath =
+                    Set.of("/healthz", "/login", "/static/app.css").contains(path)
+                            || path.matches("/join/[A-Za-z0-9_-]{32}");
             var user =
                     session.getAttribute("user") == null
                             ? null
@@ -245,6 +248,36 @@ public class WebController {
                         "text/css; charset=utf-8",
                         200);
             }
+        }
+        Matcher joining = Pattern.compile("/join/([A-Za-z0-9_-]{32})").matcher(path);
+        if (joining.matches()) {
+            method(method, "GET", "POST");
+            c.noQuery();
+            c.uniqueQuery();
+            var invitation = Invitations.describe(c.db, joining.group(1));
+            String error = null;
+            int status = 200;
+            if (method.equals("POST")) {
+                checkCsrf(c, c.parameter("csrf", ""));
+                try {
+                    Invitations.accept(c.db, joining.group(1), c.parameter("password", ""));
+                    c.session.invalidate();
+                    return redirect("/login");
+                } catch (Failure failure) {
+                    error = failure.getMessage();
+                    status = failure.status;
+                }
+            }
+            return new ModelAndView(
+                    "join",
+                    map(
+                            "invitation",
+                            invitation,
+                            "csrf",
+                            c.session.getAttribute("csrf"),
+                            "error",
+                            error),
+                    HttpStatus.valueOf(status));
         }
         if (path.equals("/login")) {
             method(method, "GET", "POST");
@@ -429,6 +462,36 @@ public class WebController {
                                     "role",
                                     c.role())),
                     200);
+        }
+        if (path.equals("/admin/invitations")) return invitations(c, method);
+        if (path.equals("/api/openservice/invitations")) {
+            method(method, "GET", "POST");
+            c.admin();
+            c.noQuery();
+            return method.equals("POST")
+                    ? json(
+                            map(
+                                    "result",
+                                    Invitations.issue(
+                                            c.db, c.user.get("user_id").toString(), body(c))),
+                            201)
+                    : json(map("result", Invitations.latest(c.db)), 200);
+        }
+        Matcher revokeInvite =
+                Pattern.compile("/(?:admin|api/openservice)/invitations/([0-9a-f]{32})/revoke")
+                        .matcher(path);
+        if (revokeInvite.matches()) {
+            method(method, "POST");
+            c.admin();
+            c.noQuery();
+            c.uniqueQuery();
+            boolean api = path.startsWith("/api/");
+            if (api && !object(body(c)).isEmpty())
+                throw new Failure(400, "Provide an empty JSON object");
+            var result =
+                    Invitations.revoke(
+                            c.db, c.user.get("user_id").toString(), revokeInvite.group(1));
+            return api ? json(map("result", result), 200) : redirect("/admin/invitations");
         }
         if (Set.of("/admin/security-events", "/api/openservice/security-events").contains(path)) {
             method(method, "GET");
@@ -702,6 +765,50 @@ public class WebController {
                                         "SELECT sys_id,name FROM os_attachment WHERE record_id=?"
                                                 + " ORDER BY sys_id",
                                         id)));
+    }
+
+    private ModelAndView invitations(Request c, String method) throws Exception {
+        method(method, "GET", "POST");
+        c.admin();
+        c.noQuery();
+        c.uniqueQuery();
+        Map<String, Object> issued = null;
+        String error = null;
+        int status = 200;
+        if (method.equals("POST")) {
+            try {
+                issued =
+                        Invitations.issue(
+                                c.db,
+                                c.user.get("user_id").toString(),
+                                map(
+                                        "name",
+                                        c.parameter("name", ""),
+                                        "role",
+                                        c.parameter("role", "reader")));
+                status = 201;
+            } catch (Failure failure) {
+                error = failure.getMessage();
+                status = failure.status;
+            }
+        }
+        var view =
+                view(
+                        c,
+                        "invitations",
+                        map(
+                                "table",
+                                "invitations",
+                                "issued",
+                                issued,
+                                "error",
+                                error,
+                                "invitations",
+                                Invitations.latest(c.db),
+                                "roles",
+                                Service.ROLES));
+        view.setStatus(HttpStatus.valueOf(status));
+        return view;
     }
 
     private ModelAndView accountDetail(Request c, String id, String method) throws Exception {

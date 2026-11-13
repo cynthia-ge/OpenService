@@ -120,3 +120,5 @@ ADOPT-05/08 now include self-service password changes with current-secret verifi
 ADOPT-09 now includes a transactional lifecycle-event journal and administrator UI/API with secret exclusion. Authentication attempts, retention/export, tamper-resistant storage and SIEM forwarding remain open. See platform cycle 7.
 
 ADOPT-08 now includes an eight-hour absolute browser-session limit, explicit 30-minute servlet idle timeout and fail-closed timestamp validation. MFA, throttling, password screening, distributed-session operations and evaluator-specific policy remain open. See platform cycle 8.
+
+ADOPT-04 is now partial: manual single-use, 24-hour invitation issuance, replacement/revocation and recipient-set credentials are implemented with audit and concurrency evidence. Reliable email delivery, address verification, membership/resource scope, provider-based onboarding and abuse controls remain open; M1 is still unmet. See platform cycle 9.

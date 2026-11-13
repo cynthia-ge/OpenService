@@ -440,8 +440,7 @@ public final class Service {
         return account(db, userId);
     }
 
-    private static void requireAccountAdministrator(Store.Db db, String actorId)
-            throws SQLException {
+    static void requireAccountAdministrator(Store.Db db, String actorId) throws SQLException {
         if (db.postgres) db.all("SELECT pg_advisory_xact_lock(18439,2)");
         if (db.one(
                         "SELECT user_id FROM os_user WHERE user_id=? AND active=1 AND role='admin'",
