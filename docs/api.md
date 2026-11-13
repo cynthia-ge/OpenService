@@ -110,3 +110,7 @@ Inactive accounts cannot authenticate through login, existing browser sessions o
 ## Administrative role changes
 
 `PATCH /api/openservice/users/{user_id}/role` requires an active administrator and exactly `{"role":"reader"}`, `{"role":"agent"}` or `{"role":"admin"}`. It returns 200 with ID/name/role/active fields; errors follow the account-state endpoint. The final active administrator cannot be demoted. Effective changes revoke browser sessions; Basic credentials remain valid under the new permissions. Inactive accounts stay inactive. The account-detail page has a separate role form (`operation=role`) with CSRF protection. Repeating the current role does not revoke sessions.
+
+## Self-service password changes
+
+`POST /api/openservice/me/password` requires exactly `current_password` and `new_password`; the latter must differ and contain 12–1024 Unicode code points. Invalid input or an incorrect current secret returns 400, unauthenticated/inactive accounts return 401, and query parameters are rejected. Success is `200 {"result":{"changed":true}}`. Every role may change only its own password. Updates serialize; the previous credential cannot win two concurrent changes. All browser sessions are revoked and old Basic credentials fail. The `/account` form posts the same fields with CSRF to `/account/password`; success redirects to login, errors render without retaining passwords. Recovery without the current secret is a separate capability.

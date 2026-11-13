@@ -48,6 +48,56 @@ class BrowserTest {
     }
 
     @Test
+    void readerChangesPasswordAndSignsInWithTheNewSecret() throws Exception {
+        String name = "PasswordBrowser" + id().substring(0, 8), next = "browser-changed-password";
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db, map("name", name, "password", WorkflowSupport.PASSWORD, "role", "reader"));
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var context = browser.newContext()) {
+            var page = context.newPage();
+            login(page, name);
+            page.navigate(base() + "/account");
+            page.getByLabel("Current password", new Page.GetByLabelOptions().setExact(true))
+                    .fill("incorrect-password");
+            page.getByLabel("New password", new Page.GetByLabelOptions().setExact(true)).fill(next);
+            page.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Change password").setExact(true))
+                    .click();
+            page.getByRole(AriaRole.ALERT)
+                    .filter(new Locator.FilterOptions().setHasText("Current password is incorrect"))
+                    .waitFor();
+            assertEquals(
+                    "",
+                    page.getByLabel("New password", new Page.GetByLabelOptions().setExact(true))
+                            .inputValue());
+            page.getByLabel("Current password", new Page.GetByLabelOptions().setExact(true))
+                    .fill(WorkflowSupport.PASSWORD);
+            page.getByLabel("New password", new Page.GetByLabelOptions().setExact(true)).fill(next);
+            page.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Change password").setExact(true))
+                    .click();
+            page.waitForURL("**/login");
+            page.getByLabel("Username", new Page.GetByLabelOptions().setExact(true)).fill(name);
+            page.getByLabel("Password", new Page.GetByLabelOptions().setExact(true)).fill(next);
+            page.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Enter your workspace"))
+                    .click();
+            page.waitForURL(base() + "/");
+            page.navigate(base() + "/account");
+            page.setViewportSize(390, 844);
+            assertTrue(
+                    (Boolean) page.evaluate("document.documentElement.scrollWidth <= innerWidth"));
+        }
+    }
+
+    @Test
     void administratorCanChangeAccountStatusAndUserMustSignInAgain() throws Exception {
         String name = "OffboardBrowser" + id().substring(0, 8);
         try (var db = store.open()) {

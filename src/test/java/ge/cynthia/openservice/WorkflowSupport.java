@@ -36,6 +36,145 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void passwordChangesRequireCurrentSecretAndInvalidateAllOldAccess() throws Exception {
+        String api = "/api/openservice/me/password", next = "changed-test-password";
+        for (String role : List.of("reader", "agent", "admin")) {
+            String name = "Password" + role;
+            account(name, role);
+            login(name);
+            var first = client;
+            try (var second =
+                    HttpClient.newBuilder()
+                            .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
+                            .build()) {
+                client = second;
+                login(name);
+                assertEquals(
+                        200,
+                        json(
+                                        "POST",
+                                        api,
+                                        map("current_password", PASSWORD, "new_password", next),
+                                        auth(name))
+                                .statusCode());
+                assertEquals(401, get("/api/openservice/me", null).statusCode());
+                client = first;
+                assertEquals(401, get("/api/openservice/me", null).statusCode());
+            } finally {
+                client = first;
+            }
+            assertEquals(401, get("/api/openservice/me", auth(name)).statusCode());
+            String credential =
+                    "Basic "
+                            + Base64.getEncoder()
+                                    .encodeToString(
+                                            (name + ":" + next).getBytes(StandardCharsets.UTF_8));
+            assertEquals(200, get("/api/openservice/me", credential).statusCode());
+            new Store(environment);
+            assertEquals(200, get("/api/openservice/me", credential).statusCode());
+        }
+        account("PasswordErrors", "reader");
+        String credential = auth("PasswordErrors");
+        for (Object bad :
+                List.of(
+                        List.of(),
+                        map(),
+                        map("current_password", 1, "new_password", next),
+                        map("current_password", "x".repeat(1025), "new_password", next),
+                        map("current_password", PASSWORD, "new_password", 1),
+                        map("current_password", PASSWORD, "new_password", "x".repeat(11)),
+                        map("current_password", PASSWORD, "new_password", "x".repeat(1025)),
+                        map("current_password", "wrong", "new_password", next),
+                        map("current_password", PASSWORD, "new_password", PASSWORD),
+                        map(
+                                "current_password",
+                                PASSWORD,
+                                "new_password",
+                                next,
+                                "user_id",
+                                "other")))
+            assertEquals(400, json("POST", api, bad, credential).statusCode());
+        assertEquals(405, get(api, credential).statusCode());
+        assertEquals(
+                400,
+                json(
+                                "POST",
+                                api + "?user=other",
+                                map("current_password", PASSWORD, "new_password", next),
+                                credential)
+                        .statusCode());
+        String token = login("PasswordErrors");
+        assertEquals(
+                403,
+                form(
+                                "/account/password",
+                                map("current_password", PASSWORD, "new_password", next),
+                                null)
+                        .statusCode());
+        var error =
+                form(
+                        "/account/password",
+                        map(
+                                "csrf",
+                                token,
+                                "current_password",
+                                "wrong-secret-value",
+                                "new_password",
+                                next),
+                        null);
+        assertEquals(400, error.statusCode());
+        assertTrue(html(error).contains("Current password is incorrect"));
+        assertFalse(html(error).contains("wrong-secret-value"));
+        assertFalse(html(error).contains(next));
+        assertEquals(
+                302,
+                form(
+                                "/account/password",
+                                map(
+                                        "csrf",
+                                        token,
+                                        "current_password",
+                                        PASSWORD,
+                                        "new_password",
+                                        next),
+                                null)
+                        .statusCode());
+        assertEquals(401, get("/api/openservice/me", null).statusCode());
+        try (var db = store.open()) {
+            assertEquals(
+                    401,
+                    assertThrows(
+                                    Failure.class,
+                                    () ->
+                                            Service.changePassword(
+                                                    db,
+                                                    "missing",
+                                                    map(
+                                                            "current_password",
+                                                            PASSWORD,
+                                                            "new_password",
+                                                            next)))
+                            .status);
+            String id =
+                    db.one("SELECT user_id FROM os_user WHERE name='PasswordErrors'")
+                            .get("user_id")
+                            .toString();
+            Service.changePassword(
+                    db, id, map("current_password", next, "new_password", "x".repeat(12)));
+            Service.changePassword(
+                    db,
+                    id,
+                    map("current_password", "x".repeat(12), "new_password", "🌟".repeat(1024)));
+            assertTrue(
+                    Passwords.matches(
+                            db.one("SELECT password FROM os_user WHERE user_id=?", id)
+                                    .get("password")
+                                    .toString(),
+                            "🌟".repeat(1024)));
+        }
+    }
+
+    @Test
     void roleChangesEnforcePermissionsRevokeSessionsAndPreserveAnAdministrator() throws Exception {
         account("RoleAgent", "agent");
         account("RoleReader", "reader");

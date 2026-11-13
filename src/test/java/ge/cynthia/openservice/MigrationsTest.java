@@ -43,6 +43,55 @@ class MigrationsTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    void concurrentPasswordChangesCannotReuseThePreviousSecret(boolean postgres) throws Exception {
+        var store = new Store(configuration(postgres));
+        String id;
+        try (var db = store.open()) {
+            id = db.one("SELECT user_id FROM os_user WHERE name='admin'").get("user_id").toString();
+        }
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var start = new CountDownLatch(1);
+            List<Future<Integer>> results = new ArrayList<>();
+            for (String next : List.of("first-new-password", "second-new-password"))
+                results.add(
+                        executor.submit(() -> {
+                            start.await();
+                            try (var db = store.open()) {
+                                try {
+                                    Service.changePassword(
+                                            db,
+                                            id,
+                                            Values.map(
+                                                    "current_password",
+                                                    "migration-test-password",
+                                                    "new_password",
+                                                    next));
+                                    db.connection.commit();
+                                    return 200;
+                                } catch (Values.Failure failure) {
+                                    db.connection.rollback();
+                                    return failure.status;
+                                }
+                            }
+                        }));
+            start.countDown();
+            var statuses =
+                    List.of(
+                            results.get(0).get(30, TimeUnit.SECONDS),
+                            results.get(1).get(30, TimeUnit.SECONDS));
+            assertEquals(1, statuses.stream().filter(status -> status == 200).count());
+            assertEquals(1, statuses.stream().filter(status -> status == 400).count());
+        }
+        try (var db = store.open()) {
+            var user = db.one("SELECT password,auth_revision FROM os_user WHERE user_id=?", id);
+            assertFalse(
+                    Passwords.matches(user.get("password").toString(), "migration-test-password"));
+            assertEquals(1, ((Number) user.get("auth_revision")).longValue());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void legacyUpgradeIsAtomicRepeatableAndPreservesData(boolean postgres) throws Exception {
         var config = configuration(postgres);
         var store = new Store(config);

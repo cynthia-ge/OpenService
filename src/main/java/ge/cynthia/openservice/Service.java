@@ -461,6 +461,30 @@ public final class Service {
         return account(db, userId);
     }
 
+    public static void changePassword(Store.Db db, String userId, Object body) throws Exception {
+        var value = object(body);
+        if (!value.keySet().equals(Set.of("current_password", "new_password"))
+                || !(value.get("current_password") instanceof String current)
+                || current.codePointCount(0, current.length()) > 1024
+                || !(value.get("new_password") instanceof String password)
+                || password.codePointCount(0, password.length()) < 12
+                || password.codePointCount(0, password.length()) > 1024)
+            throw new Failure(
+                    400, "Provide current_password and a new_password of 12–1024 characters");
+        var user =
+                db.one(
+                        "SELECT password FROM os_user WHERE user_id=? AND active=1"
+                                + (db.postgres ? " FOR UPDATE" : ""),
+                        userId);
+        if (user == null) throw new Failure(401, "Active account required");
+        if (!Passwords.matches(user.get("password").toString(), current))
+            throw new Failure(400, "Current password is incorrect");
+        if (password.equals(current)) throw new Failure(400, "Choose a different password");
+        db.update(
+                "UPDATE os_user SET password=? WHERE user_id=?", Passwords.hash(password), userId);
+        revokeSessions(db, userId);
+    }
+
     public static void revokeSessions(Store.Db db, String userId) throws SQLException {
         db.update("UPDATE os_user SET auth_revision=auth_revision+1 WHERE user_id=?", userId);
     }

@@ -141,3 +141,7 @@ Implemented local ADOPT-05 slice: active/inactive migration, administrator UI/AP
 ## OS-030 — Guarded local role administration
 
 Implemented local ADOPT-05 slice: administrator UI/API role changes, transactional final-administrator protection, immediate subsequent-request Basic permissions and browser session revocation. Account state/identity is preserved. Group inheritance, custom roles and native ServiceNow role APIs remain outside this contract. See [cycle 5](platform-foundations.md).
+
+## OS-031 — Authenticated password changes
+
+Implemented local ADOPT-05/08 slice: current-secret verification, bounded password validation, transactional update and all-browser revocation, UI/API for every local role, and concurrent replay rejection. Native password-reset applications, MFA, notification delivery and recovery are not claimed. See [cycle 6](platform-foundations.md).

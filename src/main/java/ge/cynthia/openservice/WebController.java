@@ -139,6 +139,8 @@ public class WebController {
                         && !Set.of(
                                         "/logout",
                                         "/account/sessions/revoke",
+                                        "/account/password",
+                                        "/api/openservice/me/password",
                                         "/api/openservice/me/sessions/revoke")
                                 .contains(path)) throw new Failure(403, "Read-only account");
             }
@@ -266,7 +268,33 @@ public class WebController {
         if (path.equals("/account")) {
             method(method, "GET");
             c.noQuery();
-            return view(c, "account", map("table", "account"));
+            return view(c, "account", map("table", "account", "error", null));
+        }
+        if (Set.of("/account/password", "/api/openservice/me/password").contains(path)) {
+            method(method, "POST");
+            c.noQuery();
+            c.uniqueQuery();
+            boolean api = path.startsWith("/api/");
+            try {
+                Service.changePassword(
+                        c.db,
+                        c.user.get("user_id").toString(),
+                        api
+                                ? body(c)
+                                : map(
+                                        "current_password",
+                                        c.parameter("current_password", ""),
+                                        "new_password",
+                                        c.parameter("new_password", "")));
+                c.session.invalidate();
+                return api ? json(map("result", map("changed", true)), 200) : redirect("/login");
+            } catch (Failure failure) {
+                if (api) throw failure;
+                var result =
+                        view(c, "account", map("table", "account", "error", failure.getMessage()));
+                result.setStatus(HttpStatus.valueOf(failure.status));
+                return result;
+            }
         }
         if (Set.of("/account/sessions/revoke", "/api/openservice/me/sessions/revoke")
                 .contains(path)) {
