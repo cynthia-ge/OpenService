@@ -4,7 +4,7 @@ A service operations foundation for Cynthia: clear workspaces, shared records, c
 
 ## Screenshots
 
-Captured from the application running in local Docker with PostgreSQL and synthetic demonstration data. These are working screens, not design mockups.
+Captured from the Java application in automated Chromium tests with synthetic evaluation data. These are working screens, not design mockups.
 
 ### Workspace overview
 
@@ -40,10 +40,12 @@ Captured from the application running in local Docker with PostgreSQL and synthe
 
 ## Run locally
 
-Requires Docker Compose and Python 3.12+ for the credential setup helper.
+Requires Java 27 and Docker Compose. Point `JAVA_HOME` at a Java 27 JDK. The project pins Spring Boot 4.1.2 and Maven 3.9.16.
 
 ```bash
-python3 scripts/setup-local.py && docker compose up --build -d --wait
+./mvnw -Dmaven.test.skip=true package
+java -jar target/openservice-0.2.0-SNAPSHOT.jar setup
+docker compose up --build -d --wait
 ```
 
 Open **http://localhost:8090**. Sign in as **admin**, using `ADMIN_PASSWORD` from the generated `.env` file. The file is ignored by Git, created with private permissions, and never overwritten by the setup helper. PostgreSQL has no host port; the application binds to loopback only. Changing `ADMIN_PASSWORD` after initialization does not reset the existing database user's password.
@@ -58,7 +60,7 @@ For a first review with colleagues, follow the [evaluation walkthrough](docs/eva
 - Create/edit forms, summary search, pagination, record details and responsive navigation.
 - State transitions and administrator approval/rejection for changes, enforced in the API as well as the UI.
 - Administrator-only account creation and paginated account lists in the browser; administrator, agent and reader roles, password hashes, sessions, CSRF protection and authenticated Basic API access.
-- Activity notes, persistent attachments, audit events and JSON export.
+- Activity notes, persistent attachments with metadata/list/download APIs, audit events and JSON export.
 - A shared schema registry used by validation, API services and generated forms.
 - A bounded Table API subset: CRUD, selected encoded-query operators, sorting, field projection and pagination.
 - JSON/CSV migration with dry runs, all-or-nothing validation, existing-record skipping, retained IDs and source-payload export.
@@ -85,52 +87,21 @@ See [API scope](docs/api.md), [migration guide](docs/migration.md), [architectur
 ## Development and verification
 
 ```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -e '.[test]'
-.venv/bin/python -m coverage run -m pytest -q
-.venv/bin/python -m coverage report
-.venv/bin/python -m coverage json
+sh scripts/install-browser.sh
+sh scripts/verify.sh
 ```
 
-The fast suite uses isolated SQLite databases. Run the same acceptance tests against PostgreSQL using isolated temporary schemas:
+The clean Maven build runs the API acceptance and workflow suites against both SQLite and a disposable PostgreSQL 17 Docker container, plus a Java Playwright Chromium journey at laptop, desktop and mobile sizes. It creates no records in an existing demo database. Docker must be running and Chromium installed; missing infrastructure fails the checks instead of skipping them.
 
-```bash
-docker compose --profile test build test
-docker compose --profile test run --rm test
-```
+JaCoCo requires **100% executable-line, branch and method coverage** across every production Java class, including credential setup, without exclusions. Exact line, method and branch counts are recorded in [validation](docs/validation.md). Reports are generated at `target/site/jacoco/` and `target/surefire-reports/`. Browser screenshots are in `target/browser-artifacts/`; reviewed copies are in `assets/screenshots/`.
 
-Browser journey (creates clearly synthetic sample records through the actual migration API and leaves those samples in the local demo):
+For a local JAR, configure `DATABASE_URL`, `SECRET_KEY`, `ADMIN_PASSWORD`, `COOKIE_SECURE=false` (loopback HTTP only) and optionally `PORT`, then run `java -jar target/openservice-0.2.0-SNAPSHOT.jar`. PostgreSQL and SQLite are supported. Use HTTPS and secure cookies for any shared deployment.
 
-```bash
-.venv/bin/python -m playwright install chromium
-.venv/bin/python tests/browser_journey.py
-```
-
-The journey writes fresh screenshots to ignored `artifacts/`; reviewed documentation copies are versioned in `assets/screenshots/` and embedded above. Refresh those copies after visually checking the new captures:
-
-```bash
-cp artifacts/{workspace,record,migration,mobile}.png assets/screenshots/
-```
-
-The journey tests login, creation, transitions, notes, a migration preview and a mobile viewport. It never contacts a ServiceNow instance.
-
-The separate account journey uses `OPEN_SERVICE_EVAL_URL` and `OPEN_SERVICE_EVAL_PASSWORD` for a disposable instance, creates two synthetic users and an incident, and captures desktop/mobile account screens:
-
-```bash
-.venv/bin/python tests/accounts_browser_journey.py
-```
-
-Set the password environment variable through a private prompt or your secret manager; do not put its value in shell history. See [validation notes](docs/validation.md) for the measured scope.
-
-```bash
-terraform -chdir=terraform/aws init -backend=false
-terraform -chdir=terraform/aws test
-# Repeat for terraform/gcp and terraform/azure.
-```
+Terraform is unchanged by this migration; its separate provider validation and mock-plan commands remain in [the deployment guide](terraform/README.md). No cloud resources were provisioned.
 
 ## Operational scope
 
-Cloud configurations provide HTTPS; secure cookies are enabled outside the loopback Docker demo. Each deployment starts with a single application instance and four threads. PostgreSQL locks protect record updates; optional `If-Match` revisions prevent lost updates. Schema creation is an initial bootstrap, not an upgrade migration system. Coordinate upgrades with a database backup and downtime until versioned migrations are added.
+Cloud configurations provide HTTPS; secure cookies are enabled outside the loopback Docker demo. Each deployment starts with a single application instance with embedded Tomcat. PostgreSQL locks protect record updates; optional `If-Match` revisions prevent lost updates. Schema creation is an initial bootstrap, not an upgrade migration system. Coordinate upgrades with a database backup and downtime until versioned migrations are added.
 
 SSO, granular ACL/domain isolation, rate limiting, malware scanning, background workers, email delivery, business-rule scripts and high availability are not implemented. Treat this version as a local evaluation foundation, not a hardened production service. Licensed under the [MIT License](LICENSE), preserving the licence already selected in the Cynthia GitHub repository.
 

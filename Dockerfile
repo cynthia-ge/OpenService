@@ -1,18 +1,18 @@
-FROM python:3.12-slim AS runtime
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
-WORKDIR /app
-COPY pyproject.toml requirements.lock ./
-COPY src ./src
-RUN pip install --no-cache-dir -r requirements.lock && pip install --no-cache-dir --no-deps . && useradd --uid 10001 --create-home app
-USER app
-EXPOSE 8080
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", "--timeout", "90", "openservice.app:create_app()"]
+FROM eclipse-temurin:27-jdk@sha256:9d4c29a53a1a7a028416306d090080484602ccc43cc316404e12cabd133c7056 AS build
+RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+COPY .mvn .mvn
+COPY mvnw pom.xml ./
+COPY src/main src/main
+RUN --mount=type=cache,target=/root/.m2,sharing=locked ./mvnw -B -Dmaven.test.skip=true package
 
-FROM runtime AS test
-USER root
-RUN pip install --no-cache-dir pytest==9.2.0 coverage==7.17.3
-COPY tests /app/tests
-COPY scripts /app/scripts
-USER app
-WORKDIR /tmp
-CMD ["sh", "-c", "OPEN_SERVICE_TEST_DATABASE_URL=\"$DATABASE_URL\" python -m coverage run --branch --source=openservice,/app/scripts -m pytest /app/tests -q -p no:cacheprovider && python -m coverage report --fail-under=100"]
+FROM eclipse-temurin:27-jre@sha256:05a57c9f4d6d8bf8d8c2213049ea816609672ffcc14463a9c83433a610703e10 AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /app /data && chown -R 10001:10001 /app /data
+WORKDIR /app
+COPY --from=build /build/target/openservice-0.2.0-SNAPSHOT.jar /app/app.jar
+USER 10001:10001
+ENV DATABASE_URL=sqlite:////data/openservice.db
+EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=5s --retries=10 CMD curl --fail --silent http://localhost:8080/healthz || exit 1
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

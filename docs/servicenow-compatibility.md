@@ -12,12 +12,12 @@ Target: a bounded subset of the **Australia Table API documentation**, accessed 
 | OS-004 | A4(d) | Encoded queries | Partial: equality, inequality, contains, starts-with, IN/NOT IN, AND and ordering; database filtering. No full grammar or scripting. |
 | OS-005 | A2/A4(e) | Identity and access | Partial: local admin/agent/reader, administrator account-onboarding workspace, Basic and session auth, CSRF. No password reset/deactivation, OAuth/SSO, field ACLs or domain separation. |
 | OS-006 | A3 | Incident/change/request/problem workflows | Partial: local state machines, approval by admin, revision checks. Not verified vendor state/BR semantics. |
-| OS-007 | A1/A4(a) | Audit, journal and files | Partial: persistent record events, internal notes and attachments. No native journal/Attachment API or full activity semantics. |
+| OS-007 | A1/A4(a) | Audit, journal and files | Partial: persistent record events, internal notes and attachments. Read-only attachment metadata/list/download API; no native journal API or full activity semantics. |
 | OS-008 | Recommendations | Migration/import/export | Implemented bounded JSON/CSV path with dry-run, source retention, stable IDs and repeat-import skips. See migration limits. |
 | OS-009 | A3 | Configuration items/knowledge/groups | Partial: real CRUD workspaces; not full CMDB/IRE, knowledge publishing or group membership. |
 | OS-010 | Platform operations | Docker and multi-cloud infrastructure | Docker verified locally; AWS/GCP/Azure validated and mock-plan tested, not deployed. |
 | OS-011 | A1/A4(c) | Business rules and Glide runtime | Missing; prioritize a sandboxed, explicitly scoped implementation with source-backed semantics. |
-| OS-012 | A4(a) | Aggregate, native attachments, Import Set and Batch APIs | Partial: filtered/grouped count Aggregate API added; numeric aggregates, native attachments, Import Set and Batch remain missing. |
+| OS-012 | A4(a) | Aggregate, native attachments, Import Set and Batch APIs | Partial: filtered/grouped count Aggregate API added; read-only attachment metadata/list/download supported; numeric aggregates, native attachment writes, Import Set and Batch remain missing. |
 | OS-013 | A1/A5 | Flow Designer, SLAs, catalog, update sets | Missing; no placeholder interfaces claim support. |
 | OS-014 | Enterprise operation | SSO, fine-grained ACLs, rate limits, workers, migrations | Missing; required before production adoption. |
 | OS-015 | Migration | Direct connector, attachments, journals, differential sync | Missing; next adoption-focused tranche. |
@@ -30,8 +30,8 @@ Target: a bounded subset of the **Australia Table API documentation**, accessed 
 - Bound database filters preserve literal wildcard characters and resist query injection.
 - Import preview writes nothing; errors prevent partial writes; retries skip existing records; original source exports round-trip.
 - Attachments persist and download as files; deletion removes files but preserves audit events.
-- Local Docker PostgreSQL and browser journeys are tested separately from the SQLite fast suite.
-- Coverage includes every application Python module, with 100% lines and branches. Templates/CSS are checked through rendered views and browser journeys; a Python coverage percentage does not measure visual correctness or Terraform.
+- The Maven suite runs real HTTP tests against SQLite and disposable PostgreSQL, plus Chromium browser journeys.
+- Coverage includes every production Java class with exactly 100% executable lines, methods and branch outcomes. Templates/CSS are checked through rendered views and browser journeys; JaCoCo does not measure visual correctness or Terraform.
 - Terraform uses provider validation and mock-provider plan assertions for each target; no claim of a live cloud deployment.
 
 Reproduce results with the commands in the README. Record the final measured counts and checks in `validation.md`. Future iterations should close one ledger gap at a time unless the user expands scope again.
@@ -46,9 +46,7 @@ Baseline HEAD 512a471, main, clean tree. Blueprint A4(d). Selected the missing I
 
 Contract: Australia encoded-query operator documentation, dated 2026-03-12, retrieved 2026-11-13 from the [official Australia documentation source](https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/platform-user-interface/r_OpAvailableFiltersQueries.md). The generic documentation route now returns Brazil; Australia source is the selected evidence. Literal stored-value comma-list matching is implemented; local limits and empty/null behavior are specified in api.md. No vendor-instance conformance claim.
 
-Implementation service.py; test_membership.py has 10 acceptance cases. Two positive regressions failed before implementation. Checks cover both APIs, AND/order/pagination/count/group composition, IDs, duplicate and missing values, exact literal wildcard/quote/space data, role/authentication boundaries, unknown fields and malformed/oversized lists. SQLite: 88 tests, 515/515 lines and 180/180 branches including the setup helper; service.py 160/160 lines and 76/76 branches. Runtime alone is 499/499 lines and 178/178 branches.
-
-The same 88-test suite and full line/branch coverage also pass against PostgreSQL 17 in disposable Docker containers. No demo database or external ServiceNow instance was used.
+Implementation: `Service.java`; Java contract and workflow tests run on SQLite and PostgreSQL. Current measurements are in [validation](validation.md).
 
 ## OS-005 continuation — local account onboarding, 13 November 2026
 
@@ -72,6 +70,10 @@ Acceptance checklist:
 - [x] Pagination is bounded and ordered; invalid, repeated, unknown and out-of-range parameters fail explicitly.
 - [x] Desktop/mobile Chromium verifies the complete form and subsequent agent/reader access, including absence of document overflow and browser script errors.
 
-Implementation: `accounts.py`, `app.py`, `accounts.html`, `base.html`, `app.css`. Acceptance: 24 new pytest cases in `test_accounts.py`, plus `accounts_browser_journey.py`; the initial creation/access regressions failed with 404 against the baseline. All 112 tests pass on SQLite and PostgreSQL 17. Exact counts and reproduction are in [validation](validation.md#account-onboarding-iteration): touched Python files 289/289 executable lines, 96/96 branches and 26/26 named functions; all runtime Python 550/550 lines, 192/192 branches and 41/41 functions. Templates/CSS are exercised in Chromium, not included in Python coverage percentages.
+Implementation: `Service.java`, `WebController.java`, Thymeleaf templates and CSS. Java contract/workflow tests and Chromium exercise the acceptance checklist. Current exact measurements are in [validation](validation.md).
 
 Only the local onboarding slice is implemented. OS-005 remains partial: no account editing, password reset, deactivation, SSO, inherited roles, customer separation or field/record ACLs. The evaluator walkthrough records these boundaries; this does not establish enterprise production readiness.
+
+## Java 27 migration and preserved attachment work
+
+All production logic now uses Java 27 and Spring Boot 4.1.2. Persisted records, identities, password hashes, events and attachment bytes are retained. The interrupted attachment work is included: authenticated metadata listing with exact `table_name`/`table_sys_id` filters, pagination, metadata lookup and file downloads. Orphan attachments are hidden; parent deletion removes attachment data. Native attachment upload/update/delete routes remain outside this subset. The laptop sidebar scrolling repair is preserved and tested through Chromium. Current verification is in [validation](validation.md).

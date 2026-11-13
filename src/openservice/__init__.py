@@ -1,1 +1,0 @@
-"""OpenService application package."""

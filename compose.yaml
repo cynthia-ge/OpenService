@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: openservice
       POSTGRES_USER: openservice
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?Run scripts/setup-local.py first}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Generate local credentials with the Java setup command first}
     volumes:
       - database:/var/lib/postgresql/data
     healthcheck:
@@ -19,26 +19,16 @@ services:
     ports: ["127.0.0.1:${PORT:-8090}:8080"]
     environment:
       DATABASE_URL: postgresql+psycopg://openservice:${DB_PASSWORD}@db/openservice
-      SECRET_KEY: ${SECRET_KEY:?Run scripts/setup-local.py first}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Run scripts/setup-local.py first}
+      SECRET_KEY: ${SECRET_KEY:?Generate local credentials with the Java setup command first}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Generate local credentials with the Java setup command first}
       COOKIE_SECURE: "false"
     depends_on:
       db:
         condition: service_healthy
     healthcheck:
-      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/healthz"]
       interval: 10s
       timeout: 5s
       retries: 10
-  test:
-    profiles: [test]
-    build:
-      context: .
-      target: test
-    environment:
-      DATABASE_URL: postgresql+psycopg://openservice:${DB_PASSWORD}@db/openservice
-    depends_on:
-      db:
-        condition: service_healthy
 volumes:
   database:

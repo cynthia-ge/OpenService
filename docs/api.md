@@ -1,4 +1,4 @@
-# API scope — foundation 0.1
+# API scope — Java foundation 0.2
 
 Use JSON and authenticated Basic requests, or a logged-in session with `X-CSRF-Token` for writes. Table names are listed at `GET /api/openservice/schema`. Administrator can create/delete/update; agent can create/update; reader can read. All accounts currently share the same instance and records.
 
@@ -43,3 +43,10 @@ The current error envelope is `{error:{message,detail},status:"failure"}`; messa
 ### Membership filters
 
 Table and Aggregate APIs accept `fieldINa,b` and `fieldNOT INa,b` in sysparm_query. These match stored literal values; list order and duplicate values do not duplicate records. Combine with existing ^ AND and ORDERBY terms. List membership is evaluated in the database before pagination/grouping/counts. Supports 1–100 nonempty comma-separated values, without whitespace trimming or comma/caret escaping. Unknown fields and malformed lists return 400. There is no display-value/reference resolution, dynamic JavaScript, hierarchy membership or OR grammar. Empty stored strings are ordinary values and satisfy NOT IN when absent from the list; SQL NULLs do not match either operator.
+
+
+## Read-only attachment API
+
+Authenticated `GET /api/now/attachment` lists metadata in `result`, with optional `sysparm_query` exact equality filters on `sys_id`, `file_name`, `table_name` and `table_sys_id`, joined by `^`. Pagination uses `sysparm_limit` (1–1000; default 1000) and nonnegative `sysparm_offset`. Field projection is not supported. Unknown/repeated parameters, malformed filters and unsupported fields return 400. Results exclude attachments whose parent record is absent.
+
+`GET /api/now/attachment/{sys_id}` returns one metadata object. `GET /api/now/attachment/{sys_id}/file` returns stored bytes as `application/octet-stream`, a sanitized attachment filename and an `X-Attachment-Metadata` JSON header. All local roles may read; unauthenticated API requests receive 401, missing/orphan attachments 404. Parent-record deletion removes its attachments. This is a bounded local read contract; native attachment upload/update/delete API compatibility is not implemented. Browser attachment upload remains supported for agents and administrators.
