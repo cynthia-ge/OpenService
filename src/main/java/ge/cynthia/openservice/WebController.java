@@ -693,51 +693,33 @@ public class WebController {
                 throw new Failure(415, "Send raw file bytes to this endpoint");
             if (!Set.of("table_name", "table_sys_id", "file_name").equals(c.arguments().keySet()))
                 throw new Failure(400, "Supply table_name, table_sys_id and file_name only");
-            for (String value : c.arguments().values())
-                if (value.isBlank())
-                    throw new Failure(400, "Attachment parameters must not be blank");
-            String type = c.http.getContentType();
-            try {
-                if (type == null
-                        || type.length() > 255
-                        || !org.springframework.http.MediaType.parseMediaType(type).isConcrete())
-                    throw new IllegalArgumentException();
-            } catch (IllegalArgumentException error) {
-                throw new Failure(
-                        415, "A concrete Content-Type of at most 255 characters is required");
-            }
-            var item =
-                    Service.record(
-                            c.db, c.parameter("table_name", ""), c.parameter("table_sys_id", ""));
-            byte[] bytes = c.http.getInputStream().readNBytes(5 * 1024 * 1024 + 1);
-            if (bytes.length > 5 * 1024 * 1024)
-                throw new Failure(413, "Attachments are limited to 5 MB");
-            String name = filename(c.parameter("file_name", "")), id = id();
-            c.db.update(
-                    "INSERT INTO os_attachment(sys_id,record_id,name,content,content_type)"
-                            + " VALUES(?,?,?,?,?)",
-                    id,
-                    item.get("sys_id"),
-                    name,
-                    bytes,
-                    type);
-            Service.audit(c.db, item, c.name(), "attachment", map("name", name));
-            var row =
-                    map(
-                            "sys_id",
-                            id,
-                            "file_name",
-                            name,
-                            "table_sys_id",
-                            item.get("sys_id"),
-                            "table_name",
-                            item.get("table"),
-                            "size_bytes",
-                            bytes.length,
-                            "content_type",
-                            type);
-            c.response.setHeader("Location", c.base() + "/api/now/attachment/" + id);
-            return json(map("result", metadata(c, row)), 201);
+            return saveAttachment(
+                    c,
+                    c.parameter("table_name", ""),
+                    c.parameter("table_sys_id", ""),
+                    c.parameter("file_name", ""),
+                    c.http.getContentType(),
+                    c.http.getInputStream().readNBytes(5 * 1024 * 1024 + 1));
+        }
+        if (path.equals("/api/now/attachment/upload")) {
+            method(method, "POST");
+            c.noQuery();
+            if (!(c.http instanceof MultipartHttpServletRequest multipart))
+                throw new Failure(415, "Multipart form data is required");
+            if (!Set.of("table_name", "table_sys_id").equals(c.arguments().keySet()))
+                throw new Failure(400, "Supply table_name and table_sys_id form fields only");
+            var files = multipart.getFiles("uploadFile");
+            if (!multipart.getMultiFileMap().keySet().equals(Set.of("uploadFile"))
+                    || files.size() != 1)
+                throw new Failure(400, "Supply exactly one file part named uploadFile");
+            var file = files.getFirst();
+            return saveAttachment(
+                    c,
+                    c.parameter("table_name", ""),
+                    c.parameter("table_sys_id", ""),
+                    file.getOriginalFilename(),
+                    file.getContentType(),
+                    file.getBytes());
         }
         String select =
                 "SELECT a.sys_id,a.name AS file_name,a.record_id AS table_sys_id,r.\"table\" AS"
@@ -821,6 +803,51 @@ public class WebController {
         disposition(c, (String) row.get("file_name"));
         c.response.setHeader("X-Attachment-Metadata", JSON.writeValueAsString(metadata));
         return binary((byte[]) row.get("content"), (String) row.get("content_type"), 200);
+    }
+
+    private ModelAndView saveAttachment(
+            Request c, String table, String parent, String originalName, String type, byte[] bytes)
+            throws Exception {
+        for (String value : Arrays.asList(table, parent, originalName))
+            if (value == null || value.isBlank())
+                throw new Failure(400, "Attachment fields must not be blank");
+        try {
+            if (type == null
+                    || type.length() > 255
+                    || !org.springframework.http.MediaType.parseMediaType(type).isConcrete())
+                throw new IllegalArgumentException();
+        } catch (IllegalArgumentException error) {
+            throw new Failure(415, "A concrete Content-Type of at most 255 characters is required");
+        }
+        if (bytes.length > 5 * 1024 * 1024)
+            throw new Failure(413, "Attachments are limited to 5 MB");
+        var item = Service.record(c.db, table, parent);
+        String name = filename(originalName), id = id();
+        c.db.update(
+                "INSERT INTO os_attachment(sys_id,record_id,name,content,content_type)"
+                        + " VALUES(?,?,?,?,?)",
+                id,
+                item.get("sys_id"),
+                name,
+                bytes,
+                type);
+        Service.audit(c.db, item, c.name(), "attachment", map("name", name));
+        var row =
+                map(
+                        "sys_id",
+                        id,
+                        "file_name",
+                        name,
+                        "table_sys_id",
+                        item.get("sys_id"),
+                        "table_name",
+                        item.get("table"),
+                        "size_bytes",
+                        bytes.length,
+                        "content_type",
+                        type);
+        c.response.setHeader("Location", c.base() + "/api/now/attachment/" + id);
+        return json(map("result", metadata(c, row)), 201);
     }
 
     private static Map<String, Object> metadata(Request c, Map<String, Object> row) {

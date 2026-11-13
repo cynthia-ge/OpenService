@@ -111,6 +111,20 @@ class ControllerBoundaryTest {
                     }
                 });
         assertEquals(400, dispatch(controller, request));
+        var api = new MockMultipartHttpServletRequest();
+        api.setMethod("POST");
+        api.setRequestURI("/api/now/attachment/upload");
+        api.addHeader("Authorization", WorkflowSupport.auth("admin"));
+        api.addParameter("table_name", "incident");
+        api.addParameter("table_sys_id", id);
+        api.addFile(
+                new MockMultipartFile("uploadFile", "name.txt", "text/plain", new byte[] {1}) {
+                    @Override
+                    public String getOriginalFilename() {
+                        return null;
+                    }
+                });
+        assertEquals(400, dispatch(controller, api));
         try (var mocked = mockStatic(Service.class)) {
             mocked.when(() -> Service.createAccount(any(), any()))
                     .thenThrow(new Failure(403, "Account creation denied"));

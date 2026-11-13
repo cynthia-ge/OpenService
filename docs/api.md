@@ -60,3 +60,7 @@ Success is 201 with `{result: <metadata>}` and `Location` pointing to the metada
 ### Attachment deletion
 
 `DELETE /api/now/attachment/{sys_id}` is restricted to local administrators and returns 204 with no body. It removes only that attachment, preserves its parent and prior events, and records an `attachment_deleted` event with ID, name and actor in the same transaction. Missing/orphan files return 404. Agents/readers receive 403, missing authentication 401; session mutations require CSRF. Query parameters fail with 400; DELETE on the collection or `/file` route returns 405. Authorization is OpenService's local policy, not a reproduction of ServiceNow ACLs.
+
+### Multipart attachment upload
+
+`POST /api/now/attachment/upload` accepts `multipart/form-data` with exactly the form fields `table_name` and `table_sys_id` and exactly one file part named `uploadFile`, matching the official Australia example. The file part must have a nonblank filename and a concrete Content-Type. Query parameters, repeated/extra fields, missing/multiple/unexpected file parts and blank fields return 400; non-multipart requests or missing/invalid file media types return 415. Missing parents return 404. Binary limits (empty through 5 MiB), filename normalization, role/CSRF checks, metadata/Location, persistence and audit behavior match the raw-file endpoint. Session clients use the `X-CSRF-Token` header. Responses contain the existing local metadata subset, not every native vendor field.

@@ -12,12 +12,12 @@ Target: a bounded subset of the **Australia Table API documentation**, accessed 
 | OS-004 | A4(d) | Encoded queries | Partial: equality, inequality, contains, starts-with, IN/NOT IN, AND and ordering; database filtering. No full grammar or scripting. |
 | OS-005 | A2/A4(e) | Identity and access | Partial: local admin/agent/reader, administrator account-onboarding workspace, Basic and session auth, CSRF. No password reset/deactivation, OAuth/SSO, field ACLs or domain separation. |
 | OS-006 | A3 | Incident/change/request/problem workflows | Partial: local state machines, approval by admin, revision checks. Not verified vendor state/BR semantics. |
-| OS-007 | A1/A4(a) | Audit, journal and files | Partial: persistent record events, internal notes and attachments. Read-only attachment metadata/list/download API; no native journal API or full activity semantics. |
+| OS-007 | A1/A4(a) | Audit, journal and files | Partial: persistent record events, internal notes and attachments. Attachment upload/read/delete APIs; no native journal API or full activity semantics. |
 | OS-008 | Recommendations | Migration/import/export | Implemented bounded JSON/CSV path with dry-run, source retention, stable IDs and repeat-import skips. See migration limits. |
 | OS-009 | A3 | Configuration items/knowledge/groups | Partial: real CRUD workspaces; not full CMDB/IRE, knowledge publishing or group membership. |
 | OS-010 | Platform operations | Docker and multi-cloud infrastructure | Docker verified locally; AWS/GCP/Azure validated and mock-plan tested, not deployed. |
 | OS-011 | A1/A4(c) | Business rules and Glide runtime | Missing; prioritize a sandboxed, explicitly scoped implementation with source-backed semantics. |
-| OS-012 | A4(a) | Aggregate, native attachments, Import Set and Batch APIs | Partial: filtered/grouped count Aggregate API added; read-only attachment metadata/list/download supported; numeric aggregates, native attachment writes, Import Set and Batch remain missing. |
+| OS-012 | A4(a) | Aggregate, native attachments, Import Set and Batch APIs | Partial: filtered/grouped count Aggregate API added; attachment upload/read/delete supported; numeric aggregates, attachment updates, Import Set and Batch remain missing. |
 | OS-013 | A1/A5 | Flow Designer, SLAs, catalog, update sets | Missing; no placeholder interfaces claim support. |
 | OS-014 | Enterprise operation | SSO, fine-grained ACLs, rate limits, workers, migrations | Missing; required before production adoption. |
 | OS-015 | Migration | Direct connector, attachments, journals, differential sync | Missing; next adoption-focused tranche. |
@@ -76,7 +76,7 @@ Only the local onboarding slice is implemented. OS-005 remains partial: no accou
 
 ## Java 27 migration and preserved attachment work
 
-All production logic now uses Java 27 and Spring Boot 4.1.2. Persisted records, identities, password hashes, events and attachment bytes are retained. The interrupted attachment work is included: authenticated metadata listing with exact `table_name`/`table_sys_id` filters, pagination, metadata lookup and file downloads. Orphan attachments are hidden; parent deletion removes attachment data. Native attachment upload/update/delete routes remain outside this subset. The laptop sidebar scrolling repair is preserved and tested through Chromium. Current verification is in [validation](validation.md).
+All production logic now uses Java 27 and Spring Boot 4.1.2. Persisted records, identities, password hashes, events and attachment bytes are retained. The interrupted attachment work is included: authenticated metadata listing with exact `table_name`/`table_sys_id` filters, pagination, metadata lookup and file downloads. Orphan attachments are hidden; parent deletion removes attachment data. Subsequent cycles add binary/multipart uploads and deletion; attachment updates remain outside this subset. The laptop sidebar scrolling repair is preserved and tested through Chromium. Current verification is in [validation](validation.md).
 
 ## OS-016 — Binary attachment upload
 
@@ -85,3 +85,7 @@ Implemented bounded slice, blueprint A1/A4(a). Australia Attachment API POST /fi
 ## OS-017 — Attachment deletion
 
 Implemented bounded slice, blueprint A1/A4(a). Australia Attachment API DELETE resource: an empty 204 response and 404 for missing attachments. The route previously rejected DELETE with 405; the new regression failed before implementation. OpenService restricts deletion to local administrators. Acceptance passed on both databases: administrator session with CSRF deletes metadata and bytes, returns an empty 204, preserves the parent/revision and other attachments, and records actor, ID and filename in audit history. Missing/repeated deletion returns 404; unauthenticated, reader, agent, missing-CSRF, query-parameter and wrong-route cases are rejected. The role policy is local, not vendor ACL parity. No attachment update, multipart upload or antivirus is added in this slice. Exact acceptance/coverage and QA base are recorded in [cycle 2](iteration-log.md).
+
+## OS-018 — Multipart attachment upload
+
+Implemented bounded slice, blueprint A1/A4(a). Australia Attachment API POST /upload: parent fields in the multipart body, file-part Content-Type, 201 metadata and Location. The official example uses uploadFile. The positive regression failed with 405 before implementation; a second regression using the documented part name failed with 400 before the QA repair. Acceptance passed on SQLite/PostgreSQL for agent/admin and session-CSRF uploads, literal bytes/media type, empty and maximum-size files, metadata/Location, audit persistence, oversized files, forbidden roles, missing/duplicate/extra fields, missing/multiple/wrong file parts, blank/null filenames, absent part media types, query-string rejection and invalid parent/table pairing. Binary and multipart APIs use the same validation and persistence method. Exactly one uploadFile part and the existing local metadata subset are supported. Attachment updates, malware scanning and native field/record ACL parity remain outside this slice. Exact acceptance/coverage and QA base are recorded in [cycle 3](iteration-log.md).

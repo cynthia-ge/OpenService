@@ -55,3 +55,15 @@ QA round 1: reviewed the complete diff, authorization ordering, transaction boun
 Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 258 tests pass, no skipped tests. Exact feature gate: `WebController.java`: 589/589 lines, 292/292 branches, 36/36 methods. Whole Java application: 1092/1092 lines, 592/592 branch outcomes, 88/88 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
 
 The role policy is local, not vendor ACL parity. No attachment update, multipart upload or antivirus is added in this slice. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.
+
+## Cycle 3: OS-018 — Multipart attachment upload
+
+Fixed QA base: `23954787b20ee5743a3ec67ef0a40558c90a2eb8`; branch `main`, clean starting tree. Blueprint A1/A4(a). Australia Attachment API POST /upload: parent fields in the multipart body, file-part Content-Type, 201 metadata and Location. The official example uses uploadFile. The positive regression failed with 405 before implementation; a second regression using the documented part name failed with 400 before the QA repair.
+
+Acceptance passed on SQLite/PostgreSQL for agent/admin and session-CSRF uploads, literal bytes/media type, empty and maximum-size files, metadata/Location, audit persistence, oversized files, forbidden roles, missing/duplicate/extra fields, missing/multiple/wrong file parts, blank/null filenames, absent part media types, query-string rejection and invalid parent/table pairing. Binary and multipart APIs use the same validation and persistence method.
+
+QA round 1: one confirmed contract mismatch fixed: the initial implementation required file rather than the documented uploadFile part name. Corrected production code and positive/negative acceptance cases; the documented-name regression now passes. Round 2: reviewed the complete accumulated diff, shared upload validation, request/body boundaries, rollback, permissions and docs. No new/reopened defects or repairs; all required checks pass. Unresolved: none.
+
+Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 262 tests pass, no skipped tests. Exact feature gate: `WebController.java`: 609/609 lines, 304/304 branches, 37/37 methods. Whole Java application: 1112/1112 lines, 604/604 branch outcomes, 89/89 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
+
+Exactly one uploadFile part and the existing local metadata subset are supported. Attachment updates, malware scanning and native field/record ACL parity remain outside this slice. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.

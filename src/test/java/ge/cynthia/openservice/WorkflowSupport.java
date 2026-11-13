@@ -767,4 +767,263 @@ abstract class WorkflowSupport {
             assertEquals(1, db.count("SELECT COUNT(*) FROM os_attachment"));
         }
     }
+
+    byte[] multipart(
+            List<String> fields, List<String> names, String filename, byte[] bytes, String type)
+            throws Exception {
+        var body = new ByteArrayOutputStream();
+        for (String field : fields) {
+            var pair = field.split("=", 2);
+            body.write(
+                    ("--OpenServiceTestBoundary\r\nContent-Disposition: form-data; name=\""
+                                    + pair[0]
+                                    + "\"\r\n\r\n"
+                                    + pair[1]
+                                    + "\r\n")
+                            .getBytes(StandardCharsets.UTF_8));
+        }
+        for (String name : names) {
+            body.write(
+                    ("--OpenServiceTestBoundary\r\nContent-Disposition: form-data; name=\""
+                                    + name
+                                    + "\"; filename=\""
+                                    + filename
+                                    + "\"\r\n"
+                                    + (type == null ? "" : "Content-Type: " + type + "\r\n")
+                                    + "\r\n")
+                            .getBytes(StandardCharsets.UTF_8));
+            body.write(bytes);
+            body.write("\r\n".getBytes(StandardCharsets.UTF_8));
+        }
+        body.write("--OpenServiceTestBoundary--\r\n".getBytes(StandardCharsets.UTF_8));
+        return body.toByteArray();
+    }
+
+    HttpResponse<byte[]> multipartUpload(
+            String suffix,
+            List<String> fields,
+            List<String> names,
+            String filename,
+            byte[] bytes,
+            String type,
+            String auth)
+            throws Exception {
+        return request(
+                "POST",
+                "/api/now/attachment/upload" + suffix,
+                multipart(fields, names, filename, bytes, type),
+                "multipart/form-data; boundary=OpenServiceTestBoundary",
+                auth);
+    }
+
+    @Test
+    void multipartAttachmentUploadUsesSharedPersistence() throws Exception {
+        account("agent", "agent");
+        account("reader", "reader");
+        String id = add("incident").get("sys_id").toString();
+        var fields = List.of("table_name=incident", "table_sys_id=" + id);
+        byte[] bytes = {0, 9, (byte) 255};
+        var response =
+                multipartUpload(
+                        "",
+                        fields,
+                        List.of("uploadFile"),
+                        "evidence.txt",
+                        bytes,
+                        "text/plain; charset=utf-8",
+                        auth("agent"));
+        assertEquals(201, response.statusCode(), html(response));
+        var file = object(parsed(response).get("result"));
+        assertEquals("evidence.txt", file.get("file_name"));
+        assertEquals("text/plain; charset=utf-8", file.get("content_type"));
+        assertEquals("3", file.get("size_bytes"));
+        assertEquals(
+                base() + "/api/now/attachment/" + file.get("sys_id"),
+                response.headers().firstValue("Location").orElseThrow());
+        assertArrayEquals(
+                bytes,
+                get("/api/now/attachment/" + file.get("sys_id") + "/file", auth("reader")).body());
+        assertEquals(
+                201,
+                multipartUpload(
+                                "",
+                                fields,
+                                List.of("uploadFile"),
+                                "empty",
+                                new byte[0],
+                                "application/octet-stream",
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                201,
+                multipartUpload(
+                                "",
+                                fields,
+                                List.of("uploadFile"),
+                                "limit",
+                                new byte[5 * 1024 * 1024],
+                                "application/octet-stream",
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                413,
+                multipartUpload(
+                                "",
+                                fields,
+                                List.of("uploadFile"),
+                                "large",
+                                new byte[5 * 1024 * 1024 + 1],
+                                "application/octet-stream",
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                403,
+                multipartUpload(
+                                "",
+                                fields,
+                                List.of("uploadFile"),
+                                "denied",
+                                bytes,
+                                "text/plain",
+                                auth("reader"))
+                        .statusCode());
+        assertEquals(
+                401,
+                multipartUpload(
+                                "",
+                                fields,
+                                List.of("uploadFile"),
+                                "denied",
+                                bytes,
+                                "text/plain",
+                                null)
+                        .statusCode());
+        String token = login("admin");
+        assertEquals(
+                403,
+                multipartUpload(
+                                "",
+                                fields,
+                                List.of("uploadFile"),
+                                "denied",
+                                bytes,
+                                "text/plain",
+                                null)
+                        .statusCode());
+        var session =
+                client.send(
+                        HttpRequest.newBuilder(URI.create(base() + "/api/now/attachment/upload"))
+                                .header("X-CSRF-Token", token)
+                                .header(
+                                        "Content-Type",
+                                        "multipart/form-data; boundary=OpenServiceTestBoundary")
+                                .POST(
+                                        HttpRequest.BodyPublishers.ofByteArray(
+                                                multipart(
+                                                        fields,
+                                                        List.of("uploadFile"),
+                                                        "session",
+                                                        bytes,
+                                                        "text/plain")))
+                                .build(),
+                        HttpResponse.BodyHandlers.ofByteArray());
+        assertEquals(201, session.statusCode(), html(session));
+        try (var db = store.open()) {
+            assertEquals(4, db.count("SELECT COUNT(*) FROM os_attachment"));
+            assertEquals(4, db.count("SELECT COUNT(*) FROM os_event WHERE action='attachment'"));
+        }
+    }
+
+    @Test
+    void multipartAttachmentRejectsAmbiguousOrMissingParts() throws Exception {
+        String id = add("incident").get("sys_id").toString();
+        var fields = List.of("table_name=incident", "table_sys_id=" + id);
+        byte[] bytes = {1};
+        assertEquals(
+                415, json("POST", "/api/now/attachment/upload", map(), auth("admin")).statusCode());
+        assertEquals(405, get("/api/now/attachment/upload", auth("admin")).statusCode());
+        for (var names :
+                List.of(
+                        List.<String>of(),
+                        List.of("wrong"),
+                        List.of("uploadFile", "uploadFile"),
+                        List.of("uploadFile", "extra")))
+            assertEquals(
+                    400,
+                    multipartUpload(
+                                    "",
+                                    fields,
+                                    names,
+                                    "file.txt",
+                                    bytes,
+                                    "text/plain",
+                                    auth("admin"))
+                            .statusCode());
+        for (var bad :
+                List.of(
+                        List.<String>of(),
+                        List.of("table_name=incident"),
+                        List.of("table_name=", "table_sys_id=" + id),
+                        List.of("table_name=incident", "table_sys_id=" + id, "extra=value"),
+                        List.of("table_name=incident", "table_sys_id=" + id, "table_name=problem")))
+            assertEquals(
+                    400,
+                    multipartUpload(
+                                    "",
+                                    bad,
+                                    List.of("uploadFile"),
+                                    "file.txt",
+                                    bytes,
+                                    "text/plain",
+                                    auth("admin"))
+                            .statusCode());
+        assertEquals(
+                400,
+                multipartUpload(
+                                "?extra=1",
+                                fields,
+                                List.of("uploadFile"),
+                                "file.txt",
+                                bytes,
+                                "text/plain",
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                400,
+                multipartUpload(
+                                "",
+                                fields,
+                                List.of("uploadFile"),
+                                "",
+                                bytes,
+                                "text/plain",
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                415,
+                multipartUpload(
+                                "",
+                                fields,
+                                List.of("uploadFile"),
+                                "file.txt",
+                                bytes,
+                                null,
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                404,
+                multipartUpload(
+                                "",
+                                List.of("table_name=problem", "table_sys_id=" + id),
+                                List.of("uploadFile"),
+                                "file.txt",
+                                bytes,
+                                "text/plain",
+                                auth("admin"))
+                        .statusCode());
+        try (var db = store.open()) {
+            assertEquals(0, db.count("SELECT COUNT(*) FROM os_attachment"));
+            assertEquals(0, db.count("SELECT COUNT(*) FROM os_event WHERE action='attachment'"));
+        }
+    }
 }
