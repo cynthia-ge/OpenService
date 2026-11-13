@@ -42,12 +42,14 @@ public final class Service {
 
     public static Map<String, Object> record(Store.Db db, String table, String id)
             throws SQLException {
+        var parameters = new ArrayList<Object>(List.of(table, id));
+        String access = RecordAccess.filter(db, "os_record.sys_id", parameters);
         var item =
                 db.one(
-                        "SELECT * FROM os_record WHERE \"table\"=? AND sys_id=?"
+                        "SELECT * FROM os_record WHERE \"table\"=? AND sys_id=? AND "
+                                + access
                                 + (db.postgres ? " FOR UPDATE" : ""),
-                        table,
-                        id);
+                        parameters.toArray());
         if (item == null) throw new Failure(404, "Record not found");
         return item;
     }
@@ -263,6 +265,7 @@ public final class Service {
         var columns = columns(db, schema(db, table));
         var where = new StringBuilder("\"table\"=?");
         var values = new ArrayList<Object>(List.of(table));
+        where.append(" AND ").append(RecordAccess.filter(db, "os_record.sys_id", values));
         var ordering = new ArrayList<String>();
         for (String term : encoded.split("\\^")) {
             if (term.isEmpty()) continue;

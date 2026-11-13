@@ -161,3 +161,7 @@ Implemented local ADOPT-04 slice: administrator UI/API issuance/revocation, hash
 ## OS-035 — Administrator-assisted account recovery
 
 Implemented local ADOPT-05/08/09 slice: administrator reauthentication, one-time hashed 15-minute links, replacement/revocation, issuer/target revision binding, recipient password selection, atomic single-use consumption and browser/credential revocation with sanitized audit. It does not unlock inactive users or reproduce vendor delegated reset roles, identity-verification integrations or delivery services. See [cycle 10](platform-foundations.md).
+
+## OS-036 — Private account record visibility
+
+Implemented local ADOPT-06 slice: administrator-selected private owner and consistent visibility across existing record surfaces. This is a local extension, not ServiceNow's programmable ACL engine. See [cycle 11](platform-foundations.md) for evidence, scope and exact counters.

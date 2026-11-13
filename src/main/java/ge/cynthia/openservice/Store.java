@@ -134,6 +134,8 @@ public class Store {
     public static class Db implements AutoCloseable {
         public final Connection connection;
         final boolean postgres;
+        String viewerId;
+        String viewerRole;
 
         public Db(Connection connection, boolean postgres) throws SQLException {
             this.connection = connection;

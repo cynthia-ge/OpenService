@@ -48,6 +48,53 @@ class BrowserTest {
     }
 
     @Test
+    void administratorMakesARecordPrivateThroughTheBrowser() throws Exception {
+        String name = "PrivateBrowser" + id().substring(0, 8), record;
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db, map("name", name, "role", "agent", "password", WorkflowSupport.PASSWORD));
+            record =
+                    Service.create(
+                                    db,
+                                    "incident",
+                                    map("short_description", "PrivateBrowserRecord"),
+                                    "admin")
+                            .get("sys_id")
+                            .toString();
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var adminContext = browser.newContext();
+                var userContext = browser.newContext()) {
+            var admin = adminContext.newPage();
+            var user = userContext.newPage();
+            login(admin, "admin");
+            login(user, name);
+            admin.navigate(base() + "/record/incident/" + record);
+            admin.getByLabel("Visibility", new Page.GetByLabelOptions().setExact(true))
+                    .selectOption("private");
+            admin.getByLabel("Allowed username").fill(name);
+            admin.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Save visibility"))
+                    .click();
+            user.navigate(base() + "/record/incident/" + record);
+            user.getByRole(
+                            AriaRole.HEADING,
+                            new Page.GetByRoleOptions().setName("PrivateBrowserRecord"))
+                    .waitFor();
+            assertEquals(
+                    0,
+                    user.getByRole(
+                                    AriaRole.BUTTON,
+                                    new Page.GetByRoleOptions().setName("Save visibility"))
+                            .count());
+            admin.setViewportSize(390, 844);
+            assertTrue(
+                    (Boolean) admin.evaluate("document.documentElement.scrollWidth<=innerWidth"));
+        }
+    }
+
+    @Test
     void administratorAssistsRecoveryAndOldBrowserMustAuthenticateAgain() throws Exception {
         String name = "RecoveryBrowser" + id().substring(0, 8),
                 next = "browser-recovery-password",

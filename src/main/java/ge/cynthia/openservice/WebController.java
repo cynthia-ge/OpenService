@@ -137,6 +137,8 @@ public class WebController {
                 if (path.startsWith("/api/")) throw new Failure(401, "Authentication required");
                 return redirect("/login");
             }
+            db.viewerId = user == null ? "" : user.get("user_id").toString();
+            db.viewerRole = user == null ? "" : user.get("role").toString();
             var context = new Request(db, request, response, session, user);
             if (path.startsWith("/api/")) context.uniqueQuery();
             if (!publicPath && !Set.of("GET", "HEAD", "OPTIONS").contains(method)) {
@@ -385,6 +387,31 @@ public class WebController {
                     map());
             c.session.invalidate();
             return api ? json(map("result", map("revoked", true)), 200) : redirect("/login");
+        }
+        Matcher access =
+                Pattern.compile("/(api/openservice/access|record-access)/([^/]+)/([0-9a-f]{32})")
+                        .matcher(path);
+        if (access.matches()) {
+            boolean api = access.group(1).startsWith("api/");
+            method(method, api ? "PATCH" : "POST");
+            c.admin();
+            c.noQuery();
+            c.uniqueQuery();
+            var item = Service.record(c.db, access.group(2), access.group(3));
+            Object change =
+                    api
+                            ? body(c)
+                            : map(
+                                    "visibility",
+                                    c.parameter("visibility", ""),
+                                    "owner_id",
+                                    c.parameter("visibility", "").equals("private")
+                                            ? RecordAccess.owner(c.db, c.parameter("owner", ""))
+                                            : "");
+            var result = RecordAccess.change(c.db, item, c.user.get("user_id").toString(), change);
+            return api
+                    ? json(map("result", result), 200)
+                    : redirect("/record/" + access.group(2) + "/" + access.group(3));
         }
         Matcher collection = Pattern.compile("/api/now/(?:v[12]/)?table/([^/]+)").matcher(path);
         if (collection.matches()) {
@@ -687,6 +714,12 @@ public class WebController {
             method(method, "GET");
             var file = c.db.one("SELECT * FROM os_attachment WHERE sys_id=?", download.group(1));
             if (file == null) throw new Failure(404, "Attachment not found");
+            var allowed = new ArrayList<Object>(List.of(file.get("record_id")));
+            if (c.db.one(
+                            "SELECT sys_id FROM os_record WHERE sys_id=? AND "
+                                    + RecordAccess.filter(c.db, "os_record.sys_id", allowed),
+                            allowed.toArray())
+                    == null) throw new Failure(404, "Attachment not found");
             disposition(c, (String) file.get("name"));
             return binary((byte[]) file.get("content"), (String) file.get("content_type"), 200);
         }
@@ -697,8 +730,14 @@ public class WebController {
             String table = export.group(1);
             Service.schema(c.db, table);
             var data = new ArrayList<Map<String, Object>>();
+            var parameters = new ArrayList<Object>(List.of(table));
+            String visible = RecordAccess.filter(c.db, "os_record.sys_id", parameters);
             for (var item :
-                    c.db.all("SELECT * FROM os_record WHERE \"table\"=? ORDER BY seq", table)) {
+                    c.db.all(
+                            "SELECT * FROM os_record WHERE \"table\"=? AND "
+                                    + visible
+                                    + " ORDER BY seq",
+                            parameters.toArray())) {
                 var original = object(item.get("original"));
                 if (c.parameter("source", "").equals("true") && !original.isEmpty())
                     data.add(original);
@@ -713,7 +752,13 @@ public class WebController {
         }
         if (path.equals("/audit")) {
             method(method, "GET");
-            var events = c.db.all("SELECT * FROM os_event ORDER BY seq DESC LIMIT 200");
+            var parameters = new ArrayList<Object>();
+            var events =
+                    c.db.all(
+                            "SELECT * FROM os_event WHERE "
+                                    + RecordAccess.filter(c.db, "os_event.record_id", parameters)
+                                    + " ORDER BY seq DESC LIMIT 200",
+                            parameters.toArray());
             events.forEach(event ->
                     event.put(
                             "detailText",
@@ -810,6 +855,8 @@ public class WebController {
                         item,
                         "data",
                         data,
+                        "access",
+                        item == null ? map() : RecordAccess.status(c.db, id),
                         "stateChoices",
                         choices,
                         "currentState",
@@ -1143,6 +1190,7 @@ public class WebController {
                     parameters.add(term.substring(equals + 1));
                 }
             ordering.add("a.sys_id");
+            String visible = RecordAccess.filter(c.db, "r.sys_id", parameters);
             parameters.add(limit);
             parameters.add(offset);
             var result = new ArrayList<Map<String, Object>>();
@@ -1153,6 +1201,8 @@ public class WebController {
                                     + (where.isEmpty()
                                             ? ""
                                             : " WHERE " + String.join(" AND ", where))
+                                    + (where.isEmpty() ? " WHERE " : " AND ")
+                                    + visible
                                     + " ORDER BY "
                                     + String.join(",", ordering)
                                     + " LIMIT ? OFFSET ?",
@@ -1165,10 +1215,15 @@ public class WebController {
         boolean content = route.group(2) != null;
         method(method, content ? new String[] {"GET"} : new String[] {"GET", "DELETE"});
         if (method.equals("DELETE")) c.admin();
+        var parameters = new ArrayList<Object>(List.of(route.group(1)));
         var row =
                 c.db.one(
-                        select + (content ? ",a.content" : "") + from + " WHERE a.sys_id=?",
-                        route.group(1));
+                        select
+                                + (content ? ",a.content" : "")
+                                + from
+                                + " WHERE a.sys_id=? AND "
+                                + RecordAccess.filter(c.db, "r.sys_id", parameters),
+                        parameters.toArray());
         if (row == null) throw new Failure(404, "Attachment not found");
         if (method.equals("DELETE")) {
             var parent =
@@ -1255,8 +1310,13 @@ public class WebController {
 
     private ModelAndView view(Request c, String name, Map<String, Object> data) throws Exception {
         var counts = new LinkedHashMap<String, Object>();
+        var parameters = new ArrayList<Object>();
         for (var count :
-                c.db.all("SELECT \"table\",COUNT(*) AS total FROM os_record GROUP BY \"table\""))
+                c.db.all(
+                        "SELECT \"table\",COUNT(*) AS total FROM os_record WHERE "
+                                + RecordAccess.filter(c.db, "os_record.sys_id", parameters)
+                                + " GROUP BY \"table\"",
+                        parameters.toArray()))
             counts.put((String) count.get("table"), count.get("total"));
         var model =
                 map(

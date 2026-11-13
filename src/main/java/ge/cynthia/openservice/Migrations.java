@@ -4,7 +4,7 @@ import java.sql.SQLException;
 
 /** Ordered, transactional upgrades. The caller commits schema and bootstrap data together. */
 final class Migrations {
-    static final int VERSION = 7;
+    static final int VERSION = 8;
 
     private Migrations() {}
 
@@ -94,6 +94,14 @@ final class Migrations {
             db.update(
                     "INSERT INTO os_migration(version,name) VALUES(7,?)",
                     "assisted password recovery");
+        }
+        if (version < 8) {
+            db.update(
+                    "CREATE TABLE IF NOT EXISTS os_record_access(record_id VARCHAR(32) PRIMARY"
+                        + " KEY,visibility VARCHAR(20) NOT NULL,owner_id VARCHAR(32) NOT NULL)");
+            db.update(
+                    "INSERT INTO os_migration(version,name) VALUES(8,?)",
+                    "private record visibility");
         }
     }
 

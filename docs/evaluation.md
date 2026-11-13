@@ -29,7 +29,7 @@ Administrator can also create another administrator. Duplicate names return an i
 | Reader or agent | Open `/admin/accounts` directly | Access is denied; the Accounts navigation link is absent |
 | Administrator | Return to Accounts | All local accounts and their roles are visible |
 
-All three roles can read all workspace records, notes and attachments. Agent can create/update records, add notes and upload files; administrator additionally manages account creation, imports data, approves changes and deletes records. These are action permissions, not team, customer or field isolation.
+All three roles can read workspace-visible records, notes and attachments. Administrators may restrict a record to an active account from its Record visibility form; other users then lose access to its records, files and audit snapshots. Agent can create/update records, add notes and upload files; administrator additionally manages account creation, imports data, approves changes and deletes records. These are action permissions, not team, customer or field isolation.
 
 For a broader review, use [Migration studio](migration.md) to preview a small synthetic export before applying it, inspect the audit trail and compare the [API scope](api.md) with required integrations. Keep notes on the workflow, expected behavior, observed result and any missing capability.
 
@@ -43,6 +43,6 @@ SSO, granular ACLs/domain isolation, verified delivery, authentication hardening
 
 Use **Security events** as an administrator to review successful account changes. Failed attempts are not part of this journal; it shows the latest 100 recorded lifecycle events and does not replace external security monitoring.
 
-For a recipient-set password, open **Invitations**, choose a new username and role, and create a link. Copy it from that response and share it with the intended colleague through your agreed secure channel. In a separate browser, the recipient opens the link, chooses their password and signs in. Links work once, expire after 24 hours, and can be revoked or replaced; issuer security changes also invalidate outstanding links. This manual flow does not send email or verify an address, and it retains workspace-wide read access.
+For a recipient-set password, open **Invitations**, choose a new username and role, and create a link. Copy it from that response and share it with the intended colleague through your agreed secure channel. In a separate browser, the recipient opens the link, chooses their password and signs in. Links work once, expire after 24 hours, and can be revoked or replaced; issuer security changes also invalidate outstanding links. This manual flow does not send email or verify an address, and initially provides access to workspace-visible records.
 
 For a forgotten password, an administrator opens the person’s account, verifies the recipient through the agreed support process, confirms their own password and chooses **Create recovery link**. Share the displayed link privately; it expires after 15 minutes. The recipient chooses a new password and signs in again. Existing browser sessions and the old API password stop working. **Revoke recovery link** cancels an unused link. Disabled accounts must stay disabled; recovery does not reactivate them.

@@ -35,10 +35,179 @@ abstract class WorkflowSupport {
                             "os_record",
                             "os_security_event",
                             "os_invitation",
-                            "os_recovery")) db.update("DELETE FROM " + table);
+                            "os_recovery",
+                            "os_record_access")) db.update("DELETE FROM " + table);
             db.update("DELETE FROM os_user WHERE name<>?", "admin");
             db.connection.commit();
         }
+    }
+
+    @Test
+    void privateRecordsEnforceVisibilityAcrossEveryReadAndMutationSurface() throws Exception {
+        account("PrivateOwner", "agent");
+        account("Outsider", "agent");
+        account("PrivateReader", "reader");
+        String owner =
+                object(parsed(get("/api/openservice/me", auth("PrivateOwner"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        var record =
+                object(
+                        parsed(
+                                        json(
+                                                "POST",
+                                                "/api/now/table/incident",
+                                                map("short_description", "ConfidentialNeedle"),
+                                                auth("admin")))
+                                .get("result"));
+        String id = record.get("sys_id").toString(),
+                api = "/api/now/table/incident/" + id,
+                page = "/record/incident/" + id,
+                access = "/api/openservice/access/incident/" + id;
+        assertEquals(
+                302,
+                upload(
+                                page + "/attachment",
+                                "private-evidence.bin",
+                                new byte[] {1, 2, 3},
+                                auth("admin"))
+                        .statusCode());
+        String file =
+                objects(parsed(get("/api/now/attachment", auth("admin"))).get("result"))
+                        .get(0)
+                        .get("sys_id")
+                        .toString();
+        assertEquals(
+                403,
+                json(
+                                "PATCH",
+                                access,
+                                map("visibility", "private", "owner_id", owner),
+                                auth("Outsider"))
+                        .statusCode());
+        assertEquals(
+                403,
+                json(
+                                "PATCH",
+                                access,
+                                map("visibility", "private", "owner_id", owner),
+                                auth("PrivateReader"))
+                        .statusCode());
+        for (Object bad :
+                List.of(
+                        map(),
+                        map("visibility", null, "owner_id", owner),
+                        map("visibility", "bad", "owner_id", owner),
+                        map("visibility", "private", "owner_id", 1),
+                        map("visibility", "private", "owner_id", "missing"),
+                        map("visibility", "workspace", "owner_id", owner)))
+            assertEquals(400, json("PATCH", access, bad, auth("admin")).statusCode());
+        assertEquals(405, get(access, auth("admin")).statusCode());
+        assertEquals(
+                400,
+                json(
+                                "PATCH",
+                                access + "?x=1",
+                                map("visibility", "private", "owner_id", owner),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                access,
+                                map("visibility", "private", "owner_id", owner),
+                                auth("admin"))
+                        .statusCode());
+        new Store(environment);
+        for (String name : List.of("Outsider", "PrivateReader")) {
+            for (String path :
+                    List.of(
+                            api,
+                            page,
+                            "/attachment/" + file,
+                            "/api/now/attachment/" + file,
+                            "/api/now/attachment/" + file + "/file"))
+                assertEquals(404, get(path, auth(name)).statusCode(), path);
+            for (String path :
+                    List.of(
+                            "/",
+                            "/workspace/incident",
+                            "/audit",
+                            "/export/incident",
+                            "/export/incident?source=true",
+                            "/api/now/table/incident",
+                            "/api/now/table/incident?sysparm_no_count=true",
+                            "/api/now/attachment",
+                            "/api/now/attachment?sysparm_query=file_name=private-evidence.bin")) {
+                var result = get(path, auth(name));
+                assertEquals(200, result.statusCode(), path);
+                assertFalse(html(result).contains("ConfidentialNeedle"), path);
+                assertFalse(html(result).contains(file), path);
+            }
+            assertEquals(
+                    "0",
+                    get("/api/now/table/incident", auth(name))
+                            .headers()
+                            .firstValue("X-Total-Count")
+                            .orElseThrow());
+            assertEquals(
+                    map("result", map("stats", map("count", "0"))),
+                    parsed(get("/api/now/stats/incident?sysparm_count=true", auth(name))));
+        }
+        assertEquals(
+                404,
+                json("PATCH", api, map("short_description", "stolen"), auth("Outsider"))
+                        .statusCode());
+        assertEquals(
+                404, form(page + "/note", map("body", "stolen"), auth("Outsider")).statusCode());
+        assertEquals(
+                404,
+                upload(page + "/attachment", "evil.bin", new byte[] {1}, auth("Outsider"))
+                        .statusCode());
+        assertEquals(200, get(api, auth("PrivateOwner")).statusCode());
+        assertEquals(200, get("/attachment/" + file, auth("PrivateOwner")).statusCode());
+        assertEquals(
+                200,
+                get("/api/now/attachment/" + file + "/file", auth("PrivateOwner")).statusCode());
+        assertEquals(
+                1,
+                objects(parsed(get("/api/now/attachment", auth("PrivateOwner"))).get("result"))
+                        .size());
+        assertEquals(
+                200,
+                json("PATCH", api, map("description", "owner update"), auth("PrivateOwner"))
+                        .statusCode());
+        String csrf = login("admin");
+        assertEquals(
+                403,
+                form("/record-access/incident/" + id, map("visibility", "workspace"), null)
+                        .statusCode());
+        assertEquals(
+                400,
+                form(
+                                "/record-access/incident/" + id,
+                                map("visibility", "private", "owner", "missing", "csrf", csrf),
+                                null)
+                        .statusCode());
+        assertEquals(
+                302,
+                form(
+                                "/record-access/incident/" + id,
+                                map("visibility", "workspace", "csrf", csrf),
+                                null)
+                        .statusCode());
+        assertEquals(200, get(api, auth("Outsider")).statusCode());
+        assertEquals(
+                302,
+                form(
+                                "/record-access/incident/" + id,
+                                map("visibility", "private", "owner", "PrivateOwner", "csrf", csrf),
+                                null)
+                        .statusCode());
+        assertEquals(204, json("DELETE", api, map(), auth("admin")).statusCode());
+        assertFalse(html(get("/audit", auth("Outsider"))).contains("ConfidentialNeedle"));
+        assertTrue(html(get("/audit", auth("PrivateOwner"))).contains("ConfidentialNeedle"));
     }
 
     @Test
