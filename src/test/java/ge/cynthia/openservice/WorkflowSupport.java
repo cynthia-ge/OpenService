@@ -46,6 +46,160 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void invitationAvailabilityReflectsIssuerRevocationAndUsernameConflicts() throws Exception {
+        String api = "/api/openservice/invitations";
+        account("AvailabilityIssuer", "admin");
+        String issuer =
+                object(parsed(get("/api/openservice/me", auth("AvailabilityIssuer"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        for (String operation : List.of("revision", "role", "active", "missing")) {
+            if (operation.equals("role"))
+                assertEquals(
+                        200,
+                        json(
+                                        "PATCH",
+                                        "/api/openservice/users/" + issuer + "/role",
+                                        map("role", "admin"),
+                                        auth("admin"))
+                                .statusCode());
+            var invite =
+                    object(
+                            parsed(
+                                            json(
+                                                    "POST",
+                                                    api,
+                                                    map(
+                                                            "name",
+                                                            "Availability" + operation,
+                                                            "role",
+                                                            "reader"),
+                                                    auth("AvailabilityIssuer")))
+                                    .get("result"));
+            String id = invite.get("invite_id").toString();
+            assertEquals("pending", invite.get("state"));
+            if (operation.equals("revision"))
+                assertEquals(
+                        200,
+                        json(
+                                        "POST",
+                                        "/api/openservice/me/sessions/revoke",
+                                        map(),
+                                        auth("AvailabilityIssuer"))
+                                .statusCode());
+            if (operation.equals("role"))
+                assertEquals(
+                        200,
+                        json(
+                                        "PATCH",
+                                        "/api/openservice/users/" + issuer + "/role",
+                                        map("role", "reader"),
+                                        auth("admin"))
+                                .statusCode());
+            if (operation.equals("active"))
+                assertEquals(
+                        200,
+                        json(
+                                        "PATCH",
+                                        "/api/openservice/users/" + issuer + "/status",
+                                        map("active", false),
+                                        auth("admin"))
+                                .statusCode());
+            if (operation.equals("missing")) {
+                try (var db = store.open()) {
+                    db.update("DELETE FROM os_user WHERE user_id=?", issuer);
+                    db.connection.commit();
+                }
+            }
+            var shown =
+                    objects(parsed(get(api, auth("admin"))).get("result")).stream()
+                            .filter(e -> e.get("invite_id").equals(id))
+                            .findFirst()
+                            .orElseThrow();
+            assertEquals("invalidated", shown.get("state"));
+            assertEquals(400, get(invite.get("accept_path").toString(), null).statusCode());
+            new Store(environment);
+            assertEquals(
+                    "invalidated",
+                    objects(parsed(get(api, auth("admin"))).get("result")).getFirst().get("state"));
+            if (operation.equals("active"))
+                assertEquals(
+                        200,
+                        json(
+                                        "PATCH",
+                                        "/api/openservice/users/" + issuer + "/status",
+                                        map("active", true),
+                                        auth("admin"))
+                                .statusCode());
+            if (operation.equals("role"))
+                assertEquals(
+                        200,
+                        json(
+                                        "PATCH",
+                                        "/api/openservice/users/" + issuer + "/role",
+                                        map("role", "admin"),
+                                        auth("admin"))
+                                .statusCode());
+            if (operation.equals("revision")) {
+                var replacement =
+                        object(
+                                parsed(
+                                                json(
+                                                        "POST",
+                                                        api,
+                                                        map(
+                                                                "name",
+                                                                "Availabilityrevision",
+                                                                "role",
+                                                                "reader"),
+                                                        auth("admin")))
+                                        .get("result"));
+                assertEquals("pending", replacement.get("state"));
+                assertEquals(
+                        200, get(replacement.get("accept_path").toString(), null).statusCode());
+            }
+        }
+        var collision =
+                object(
+                        parsed(
+                                        json(
+                                                "POST",
+                                                api,
+                                                map("name", "AlreadyCreated", "role", "reader"),
+                                                auth("admin")))
+                                .get("result"));
+        account("AlreadyCreated", "reader");
+        assertEquals(
+                "unavailable",
+                objects(parsed(get(api, auth("admin"))).get("result")).getFirst().get("state"));
+        assertEquals(400, get(collision.get("accept_path").toString(), null).statusCode());
+        String csrf = login("admin");
+        String page = html(get("/admin/invitations", null));
+        assertTrue(page.contains("invalidated"));
+        assertTrue(page.contains("unavailable"));
+        assertEquals(
+                302,
+                form(
+                                "/admin/invitations/" + collision.get("invite_id") + "/revoke",
+                                map("csrf", csrf),
+                                null)
+                        .statusCode());
+        assertEquals(
+                "revoked", objects(parsed(get(api, null)).get("result")).getFirst().get("state"));
+        try (var db = store.open()) {
+            db.update("UPDATE os_invitation SET expires_at=0 WHERE name='Availabilitymissing'");
+            db.connection.commit();
+        }
+        assertEquals(
+                "expired",
+                objects(parsed(get(api, null)).get("result")).stream()
+                        .filter(e -> e.get("name").equals("Availabilitymissing"))
+                        .findFirst()
+                        .orElseThrow()
+                        .get("state"));
+    }
+
+    @Test
     void journalHistoryPagesAndDownloadsPreserveAccessAndStableBoundaries() throws Exception {
         account("JournalDenied", "reader");
         login("admin");

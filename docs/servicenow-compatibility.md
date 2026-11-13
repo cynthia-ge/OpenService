@@ -189,3 +189,7 @@ Implemented local ADOPT-03/05 slice: administrator username/role/state filters, 
 ## OS-042 — Journal history navigation and export
 
 Implemented local ADOPT-09 slice: bounded cursor pages, Older/Latest browser navigation and permission-checked selected-page JSON downloads for account and authentication journals. It is not native sys_audit or Log Export Service parity. See [cycle 17](platform-foundations.md) for exact evidence.
+
+## OS-043 — Accurate invitation availability
+
+Implemented local ADOPT-04/05 correction: derived invalidated/unavailable states match issuer and username eligibility; public redemption, replacement guidance and revocation agree. Product-specific vendor magic-link documentation informs lifecycle handling without implying a universal invite API. See [cycle 18](platform-foundations.md).

@@ -48,6 +48,45 @@ class BrowserTest {
     }
 
     @Test
+    void administratorSeesAndRevokesAnInvalidatedInvitation() throws Exception {
+        String name = "UnavailableBrowser" + id().substring(0, 8);
+        try (var db = store.open()) {
+            String admin =
+                    db.one("SELECT user_id FROM os_user WHERE name='admin'")
+                            .get("user_id")
+                            .toString();
+            var invite = Invitations.issue(db, admin, map("name", name, "role", "reader"));
+            db.update(
+                    "UPDATE os_invitation SET issuer_revision=-1 WHERE invite_id=?",
+                    invite.get("invite_id"));
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var context = browser.newContext()) {
+            var page = context.newPage();
+            login(page, "admin");
+            page.getByRole(
+                            AriaRole.LINK,
+                            new Page.GetByRoleOptions().setName("Invitations").setExact(true))
+                    .click();
+            var row =
+                    page.getByRole(AriaRole.ROW)
+                            .filter(new Locator.FilterOptions().setHasText(name));
+            assertTrue(row.innerText().contains("invalidated"));
+            row.getByRole(AriaRole.BUTTON, new Locator.GetByRoleOptions().setName("Revoke"))
+                    .click();
+            assertTrue(
+                    page.getByRole(AriaRole.ROW)
+                            .filter(new Locator.FilterOptions().setHasText(name))
+                            .innerText()
+                            .contains("revoked"));
+            page.setViewportSize(390, 844);
+            assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth<=innerWidth"));
+        }
+    }
+
+    @Test
     void administratorBrowsesAndDownloadsOlderJournalPages() throws Exception {
         try (var db = store.open()) {
             String admin =

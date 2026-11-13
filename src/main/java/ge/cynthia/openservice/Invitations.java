@@ -38,15 +38,26 @@ final class Invitations {
                 actor,
                 db.one("SELECT auth_revision FROM os_user WHERE user_id=?", actor)
                         .get("auth_revision"));
-        var result = visible(db.one("SELECT * FROM os_invitation WHERE invite_id=?", id));
+        var result = visible(db, db.one("SELECT * FROM os_invitation WHERE invite_id=?", id));
         result.put("accept_path", "/join/" + token);
         return result;
     }
 
-    private static Map<String, Object> visible(Map<String, Object> row) {
+    private static Map<String, Object> visible(Store.Db db, Map<String, Object> row)
+            throws SQLException {
         long expires = ((Number) row.get("expires_at")).longValue();
         String state = row.get("state").toString();
-        if (state.equals("pending") && expires <= System.currentTimeMillis()) state = "expired";
+        if (state.equals("pending")) {
+            if (expires <= System.currentTimeMillis()) state = "expired";
+            else if (db.one(
+                            "SELECT user_id FROM os_user WHERE user_id=? AND active=1 AND"
+                                + " role='admin' AND auth_revision=?",
+                            row.get("issuer_id"),
+                            row.get("issuer_revision"))
+                    == null) state = "invalidated";
+            else if (db.one("SELECT user_id FROM os_user WHERE name=?", row.get("name")) != null)
+                state = "unavailable";
+        }
         return map(
                 "invite_id",
                 row.get("invite_id"),
@@ -69,12 +80,12 @@ final class Invitations {
     static List<Map<String, Object>> latest(Store.Db db) throws SQLException {
         var result = new ArrayList<Map<String, Object>>();
         for (var row : db.all("SELECT * FROM os_invitation ORDER BY sequence DESC LIMIT 100"))
-            result.add(visible(row));
+            result.add(visible(db, row));
         return result;
     }
 
     static Map<String, Object> describe(Store.Db db, String token) throws Exception {
-        return visible(pending(db, token, false));
+        return visible(db, pending(db, token, false));
     }
 
     private static Map<String, Object> pending(Store.Db db, String token, boolean lockIssuer)
@@ -88,11 +99,13 @@ final class Invitations {
                 || ((Number) row.get("expires_at")).longValue() <= System.currentTimeMillis()
                 || db.one(
                                 "SELECT user_id FROM os_user WHERE user_id=? AND active=1 AND"
-                                    + " role='admin' AND auth_revision=?"
+                                        + " role='admin' AND auth_revision=?"
                                         + (lockIssuer && db.postgres ? " FOR UPDATE" : ""),
                                 row.get("issuer_id"),
                                 row.get("issuer_revision"))
-                        == null) throw new Failure(400, "Invitation is unavailable or expired");
+                        == null
+                || db.one("SELECT user_id FROM os_user WHERE name=?", row.get("name")) != null)
+            throw new Failure(400, "Invitation is unavailable or expired");
         return row;
     }
 
@@ -125,13 +138,13 @@ final class Invitations {
         if (row == null) throw new Failure(404, "Invitation not found");
         if (row.get("state").equals("accepted"))
             throw new Failure(409, "Deactivate the accepted account to remove access");
-        if (row.get("state").equals("revoked")) return visible(row);
+        if (row.get("state").equals("revoked")) return visible(db, row);
         db.update(
                 "UPDATE os_invitation SET state='revoked',revoked_by=? WHERE invite_id=?",
                 actor,
                 id);
         row.put("state", "revoked");
         row.put("revoked_by", actor);
-        return visible(row);
+        return visible(db, row);
     }
 }
