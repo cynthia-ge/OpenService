@@ -715,4 +715,56 @@ abstract class WorkflowSupport {
         assertArrayEquals(
                 bytes, get("/api/now/attachment/" + file.get("sys_id") + "/file", null).body());
     }
+
+    @Test
+    void attachmentDeletionIsAuthorizedAuditedAndIsolated() throws Exception {
+        account("agent", "agent");
+        account("reader", "reader");
+        String id = add("incident").get("sys_id").toString();
+        var uploaded =
+                request(
+                        "POST",
+                        binaryPath(id, "remove.txt"),
+                        new byte[] {1, 2},
+                        "text/plain",
+                        auth("admin"));
+        String file = object(parsed(uploaded).get("result")).get("sys_id").toString(),
+                path = "/api/now/attachment/" + file;
+        request("POST", binaryPath(id, "keep.txt"), new byte[] {3}, "text/plain", auth("admin"));
+        assertEquals(401, json("DELETE", path, map(), null).statusCode());
+        for (String role : List.of("agent", "reader"))
+            assertEquals(403, json("DELETE", path, map(), auth(role)).statusCode());
+        assertEquals(405, json("DELETE", path + "/file", map(), auth("admin")).statusCode());
+        assertEquals(405, json("DELETE", "/api/now/attachment", map(), auth("admin")).statusCode());
+        assertEquals(400, json("DELETE", path + "?extra=1", map(), auth("admin")).statusCode());
+        String token = login("admin");
+        assertEquals(403, json("DELETE", path, map(), null).statusCode());
+        var deleted =
+                client.send(
+                        HttpRequest.newBuilder(URI.create(base() + path))
+                                .header("X-CSRF-Token", token)
+                                .DELETE()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofByteArray());
+        assertEquals(204, deleted.statusCode(), html(deleted));
+        assertEquals(0, deleted.body().length);
+        assertEquals(404, json("DELETE", path, map(), auth("admin")).statusCode());
+        assertEquals(404, get(path, auth("admin")).statusCode());
+        assertEquals(404, get(path + "/file", auth("admin")).statusCode());
+        assertEquals(404, get("/attachment/" + file, auth("admin")).statusCode());
+        assertEquals(
+                1, objects(parsed(get("/api/now/attachment", auth("admin"))).get("result")).size());
+        try (var db = store.open()) {
+            assertEquals(
+                    "0",
+                    Service.serialize(Service.record(db, "incident", id)).get("sys_mod_count"));
+            var event = db.one("SELECT * FROM os_event WHERE action='attachment_deleted'");
+            assertNotNull(event);
+            assertEquals("admin", event.get("actor"));
+            assertEquals(file, object(event.get("detail")).get("sys_id"));
+            assertEquals("remove.txt", object(event.get("detail")).get("name"));
+            assertEquals(id, event.get("record_id"));
+            assertEquals(1, db.count("SELECT COUNT(*) FROM os_attachment"));
+        }
+    }
 }

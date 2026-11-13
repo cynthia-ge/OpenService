@@ -43,3 +43,15 @@ QA round 1: two confirmed issues fixed: download Content-Type gained an unwanted
 Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 256 tests pass, no skipped tests. Exact feature gate: `Store.java`: 89/89 lines, 52/52 branches, 10/10 methods; `WebController.java`: 578/578 lines, 286/286 branches, 36/36 methods. Whole Java application: 1081/1081 lines, 586/586 branch outcomes, 88/88 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Store.java`, `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
 
 No multipart upload, attachment updates, antivirus or granular record ACL parity is claimed in this slice. Schema upgrade requires one application instance; legacy/browser uploads retain the octet-stream default. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.
+
+## Cycle 2: OS-017 — Attachment deletion
+
+Fixed QA base: `696b47c250a7affb610ad9daf000d550d5c89b82`; branch `main`, clean starting tree. Blueprint A1/A4(a). Australia Attachment API DELETE resource: an empty 204 response and 404 for missing attachments. The route previously rejected DELETE with 405; the new regression failed before implementation. OpenService restricts deletion to local administrators.
+
+Acceptance passed on both databases: administrator session with CSRF deletes metadata and bytes, returns an empty 204, preserves the parent/revision and other attachments, and records actor, ID and filename in audit history. Missing/repeated deletion returns 404; unauthenticated, reader, agent, missing-CSRF, query-parameter and wrong-route cases are rejected.
+
+QA round 1: reviewed the complete diff, authorization ordering, transaction boundaries, parent/attachment isolation, response body, tests and docs. No new or reopened findings, no repairs, no unresolved issues; all required checks pass.
+
+Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 258 tests pass, no skipped tests. Exact feature gate: `WebController.java`: 589/589 lines, 292/292 branches, 36/36 methods. Whole Java application: 1092/1092 lines, 592/592 branch outcomes, 88/88 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
+
+The role policy is local, not vendor ACL parity. No attachment update, multipart upload or antivirus is added in this slice. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.

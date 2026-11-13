@@ -739,12 +739,12 @@ public class WebController {
             c.response.setHeader("Location", c.base() + "/api/now/attachment/" + id);
             return json(map("result", metadata(c, row)), 201);
         }
-        method(method, "GET");
         String select =
                 "SELECT a.sys_id,a.name AS file_name,a.record_id AS table_sys_id,r.\"table\" AS"
                         + " table_name,a.content_type,length(a.content) AS size_bytes";
         String from = " FROM os_attachment a JOIN os_record r ON r.sys_id=a.record_id";
         if (path.equals("/api/now/attachment")) {
+            method(method, "GET");
             c.uniqueQuery();
             var args = c.arguments();
             if (!Set.of("sysparm_query", "sysparm_limit", "sysparm_offset")
@@ -796,11 +796,26 @@ public class WebController {
         if (!route.matches()) throw new Failure(404, "Resource not found");
         c.noQuery();
         boolean content = route.group(2) != null;
+        method(method, content ? new String[] {"GET"} : new String[] {"GET", "DELETE"});
+        if (method.equals("DELETE")) c.admin();
         var row =
                 c.db.one(
                         select + (content ? ",a.content" : "") + from + " WHERE a.sys_id=?",
                         route.group(1));
         if (row == null) throw new Failure(404, "Attachment not found");
+        if (method.equals("DELETE")) {
+            var parent =
+                    Service.record(
+                            c.db, (String) row.get("table_name"), (String) row.get("table_sys_id"));
+            c.db.update("DELETE FROM os_attachment WHERE sys_id=?", row.get("sys_id"));
+            Service.audit(
+                    c.db,
+                    parent,
+                    c.name(),
+                    "attachment_deleted",
+                    map("sys_id", row.get("sys_id"), "name", row.get("file_name")));
+            return binary(new byte[0], "application/json", 204);
+        }
         var metadata = metadata(c, row);
         if (!content) return json(map("result", metadata), 200);
         disposition(c, (String) row.get("file_name"));

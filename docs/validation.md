@@ -1,6 +1,6 @@
 # Java 27 validation — 13 November 2026
 
-`JAVA_HOME=<Temurin 27.0.1.0.2+1> ./mvnw clean verify` passes **256 JUnit tests**, with zero failures, errors or skipped tests. Spring Boot 4.1.2 and Maven 3.9.16 are pinned. Exact JaCoCo totals: **1081/1081 lines, 586/586 branch outcomes, 88/88 methods**.
+`JAVA_HOME=<Temurin 27.0.1.0.2+1> ./mvnw clean verify` passes **258 JUnit tests**, with zero failures, errors or skipped tests. Spring Boot 4.1.2 and Maven 3.9.16 are pinned. Exact JaCoCo totals: **1092/1092 lines, 592/592 branch outcomes, 88/88 methods**.
 
 | Production source | Lines | Branch outcomes | Methods |
 |---|---:|---:|---:|
@@ -10,7 +10,7 @@
 | `Setup.java` | 19/19 | 4/4 | 1/1 |
 | `Store.java` | 89/89 | 52/52 | 10/10 |
 | `Values.java` | 15/15 | 4/4 | 8/8 |
-| `WebController.java` | 578/578 | 286/286 | 36/36 |
+| `WebController.java` | 589/589 | 292/292 | 36/36 |
 
 Every production Java class is instrumented, including startup and credential setup. Maven and the skill's exact-count gate require a ratio of 1.0 for lines, branches and methods, without exclusions. Templates/CSS are exercised through rendered pages and Chromium; Java coverage does not measure visual correctness or Terraform.
 
