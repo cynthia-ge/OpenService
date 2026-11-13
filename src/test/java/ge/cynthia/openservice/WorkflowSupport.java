@@ -1266,4 +1266,47 @@ abstract class WorkflowSupport {
                         get(endpoint + "sysparm_query=" + encoded(query), auth("admin"))
                                 .statusCode());
     }
+
+    @Test
+    void notLikeExcludesLiteralSubstringsWithoutMatchingNulls() throws Exception {
+        var ids = textQueryFixtures();
+        for (var entry :
+                Map.of(
+                                "tail",
+                                List.of(0, 1),
+                                "%_\\end",
+                                List.of(2),
+                                "x' OR '1'='1",
+                                List.of(4),
+                                "é",
+                                List.of(6),
+                                "absent",
+                                List.<Integer>of())
+                        .entrySet()) {
+            var expected = new ArrayList<String>();
+            for (int i = 0; i < 7; i++) if (!entry.getValue().contains(i)) expected.add(ids.get(i));
+            String query = "assigned_toNOT LIKE" + entry.getKey() + "^ORDERBYshort_description";
+            assertEquals(
+                    expected, tableQuery(query, "").stream().map(r -> r.get("sys_id")).toList());
+            countQuery(query, expected.size());
+        }
+        String combined = "assigned_toNOT LIKEtail^assigned_toISNOTEMPTY^ORDERBYshort_description";
+        assertEquals(
+                List.of(ids.get(3), ids.get(4)),
+                tableQuery(combined, "&sysparm_limit=2&sysparm_offset=1").stream()
+                        .map(r -> r.get("sys_id"))
+                        .toList());
+        countQuery(combined, 4);
+        assertEquals(List.of(), tableQuery("assigned_toNOT LIKE", ""));
+        countQuery("assigned_toNOT LIKE", 0);
+        for (String query : List.of("unknownNOT LIKEtail", "assigned_toNOTLIKEtail"))
+            for (String endpoint :
+                    List.of(
+                            "/api/now/table/incident?",
+                            "/api/now/stats/incident?sysparm_count=true&"))
+                assertEquals(
+                        400,
+                        get(endpoint + "sysparm_query=" + encoded(query), auth("admin"))
+                                .statusCode());
+    }
 }

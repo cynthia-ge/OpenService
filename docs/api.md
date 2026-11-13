@@ -76,3 +76,7 @@ Table and count Aggregate APIs accept `fieldISEMPTY` and `fieldISNOTEMPTY`, with
 ## Literal suffix queries
 
 `fieldENDSWITHvalue` is available to Table and count Aggregate APIs and combines with AND, ordering and pagination. Values are bound parameters: percent, underscore, backslash, quotes and Unicode are literal characters. An empty suffix matches every non-null string, including an empty one; SQL nulls do not match. Unknown fields/operators return 400. String LIKE-family queries use the existing database comparison policy (SQLite's default ASCII-insensitive LIKE; PostgreSQL's case-sensitive LIKE); cross-database case folding and vendor collation parity are not claimed.
+
+## Literal negative substring queries
+
+`fieldNOT LIKEvalue` (with a space in `NOT LIKE`) selects non-null stored strings that do not contain the literal value. It shares the LIKE-family escaping/comparison policy above and runs before Table pagination and Aggregate counts. Empty stored strings match when the operand is nonempty; an empty operand selects no records. SQL null/missing values are excluded. Unknown fields and the unsupported spelling `NOTLIKE` return 400. AND composition and ordering are supported.

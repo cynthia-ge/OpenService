@@ -275,7 +275,7 @@ public final class Service {
             }
             Matcher match =
                     Pattern.compile(
-                                    "([a-z_][a-z_0-9]*)(!=|=|LIKE|STARTSWITH|ENDSWITH|NOT"
+                                    "([a-z_][a-z_0-9]*)(!=|=|LIKE|NOT LIKE|STARTSWITH|ENDSWITH|NOT"
                                             + " IN|IN|ISEMPTY|ISNOTEMPTY)(.*)",
                                     Pattern.DOTALL)
                             .matcher(term);
@@ -304,8 +304,11 @@ public final class Service {
                         .append(String.join(",", Collections.nCopies(members.size(), "?")))
                         .append(')');
                 values.addAll(members);
-            } else if (Set.of("LIKE", "STARTSWITH", "ENDSWITH").contains(op)) {
-                where.append(" AND ").append(column).append(" LIKE ? ESCAPE '\\'");
+            } else if (Set.of("LIKE", "STARTSWITH", "ENDSWITH", "NOT LIKE").contains(op)) {
+                where.append(" AND ")
+                        .append(column)
+                        .append(op.equals("NOT LIKE") ? " NOT" : "")
+                        .append(" LIKE ? ESCAPE '\\'");
                 values.add(
                         (op.equals("STARTSWITH") ? "" : "%")
                                 + escaped(value)

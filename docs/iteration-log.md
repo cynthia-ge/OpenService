@@ -103,3 +103,15 @@ QA round 1: reviewed operator parsing, wildcard placement, escaping and binding,
 Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 268 tests pass, no skipped tests. Exact feature gate: `Service.java`: 349/349 lines, 212/212 branches, 26/26 methods. Whole Java application: 1125/1125 lines, 616/616 branch outcomes, 89/89 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Service.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
 
 Existing database LIKE comparison policy is retained: SQLite default ASCII-insensitive behavior differs from PostgreSQL case-sensitive behavior. No vendor collation, reference/display-value or full encoded-query parity is claimed. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.
+
+## Cycle 7: OS-022 — Literal NOT LIKE filtering
+
+Fixed QA base: `d8549cf71c3258549367e9bd7214c3d75f13ff6a`; branch `main`, clean starting tree. Blueprint A4(d). Australia operator reference spells the negative substring operator NOT LIKE with a space. The positive HTTP regression failed with unsupported-query 400 before implementation. OpenService binds and escapes a literal substring, using SQL NOT LIKE.
+
+Both database suites verify exclusion of ordinary, wildcard/backslash, quote/injection-shaped and Unicode substrings; absent/empty operands; empty stored strings and null exclusion; AND with ISNOTEMPTY; ordering/pagination; matching full-selection aggregate counts; and unknown fields/unsupported spelling.
+
+QA round 1: reviewed parsing versus NOT IN and LIKE, bound SQL/wildcard escaping, three-valued null semantics, combined predicates, count/pagination callers, tests and docs. No new/reopened findings or repairs; all required checks pass. Unresolved: none.
+
+Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 270 tests pass, no skipped tests. Exact feature gate: `Service.java`: 352/352 lines, 214/214 branches, 26/26 methods. Whole Java application: 1128/1128 lines, 618/618 branch outcomes, 89/89 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Service.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
+
+Existing database case-comparison differences and stored-value-only scope remain documented. No display-value resolution or complete vendor encoded-query parity is claimed. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.
