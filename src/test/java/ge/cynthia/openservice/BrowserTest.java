@@ -48,6 +48,51 @@ class BrowserTest {
     }
 
     @Test
+    void administratorInvestigatesAFailedLoginInTheBrowser() throws Exception {
+        String name = "JournalBrowser" + id().substring(0, 8);
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db, map("name", name, "role", "reader", "password", WorkflowSupport.PASSWORD));
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var context = browser.newContext()) {
+            var page = context.newPage();
+            page.navigate(base() + "/login");
+            page.getByLabel("Username", new Page.GetByLabelOptions().setExact(true)).fill(name);
+            page.getByLabel("Password", new Page.GetByLabelOptions().setExact(true))
+                    .fill("wrong-password");
+            page.waitForResponse(
+                    rsp -> rsp.url().endsWith("/login") && rsp.status() == 401,
+                    () ->
+                            page.getByRole(
+                                            AriaRole.BUTTON,
+                                            new Page.GetByRoleOptions()
+                                                    .setName("Enter your workspace"))
+                                    .click());
+            login(page, "admin");
+            page.getByRole(
+                            AriaRole.LINK,
+                            new Page.GetByRoleOptions()
+                                    .setName("Authentication events")
+                                    .setExact(true))
+                    .click();
+            page.getByRole(
+                            AriaRole.HEADING,
+                            new Page.GetByRoleOptions().setName("Authentication events"))
+                    .waitFor();
+            assertTrue(
+                    page.getByRole(AriaRole.ROW)
+                            .filter(new Locator.FilterOptions().setHasText(name))
+                            .innerText()
+                            .contains("failed"));
+            page.setViewportSize(390, 844);
+            assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth<=innerWidth"));
+        }
+    }
+
+    @Test
     void browserExplainsTemporaryLoginThrottlingAndAllowsLoginAfterExpiry() throws Exception {
         String name = "ThrottleBrowser" + id().substring(0, 8);
         try (var db = store.open()) {

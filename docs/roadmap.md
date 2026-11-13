@@ -138,3 +138,5 @@ Cycle 12 / ADOPT-03/06: persistent group membership now has administrator UI/API
 Cycle 13 / ADOPT-06: administrator-selected group visibility is enforced across every existing record surface using current membership, including removal in existing sessions and fail-closed group deletion. Requester defaults, field ACLs, inherited roles and enterprise identity remain open; M1 remains unmet.
 
 Cycle 14 / ADOPT-08: persistent shared browser/Basic password-attempt limits now include automatic expiry, concurrent enforcement, bounded storage and a usable 429 browser flow. MFA, edge/distributed limits, token and authenticated password-confirmation limits remain missing; M1 remains unmet.
+
+Cycle 15 / ADOPT-09: administrator authentication-event UI/API now records durable, sanitized browser/Basic success, failure and throttling with rolling retention. Complete authorization/session monitoring, archive/export, SIEM delivery and organization-approved retention remain open. M1 remains unmet.

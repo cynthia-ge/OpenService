@@ -4,7 +4,7 @@ import java.sql.SQLException;
 
 /** Ordered, transactional upgrades. The caller commits schema and bootstrap data together. */
 final class Migrations {
-    static final int VERSION = 11;
+    static final int VERSION = 12;
 
     private Migrations() {}
 
@@ -118,10 +118,24 @@ final class Migrations {
         if (version < 11) {
             db.update(
                     "CREATE TABLE IF NOT EXISTS os_auth_attempt(identity_hash VARCHAR(64) PRIMARY"
-                        + " KEY,failures INTEGER NOT NULL,expires_at BIGINT NOT NULL)");
+                            + " KEY,failures INTEGER NOT NULL,expires_at BIGINT NOT NULL)");
             db.update(
                     "INSERT INTO os_migration(version,name) VALUES(11,?)",
                     "persistent authentication throttling");
+        }
+        if (version < 12) {
+            db.update(
+                    "CREATE TABLE IF NOT EXISTS os_auth_event(sequence "
+                            + (db.postgres
+                                    ? "BIGSERIAL PRIMARY KEY"
+                                    : "INTEGER PRIMARY KEY AUTOINCREMENT")
+                            + ",event_id VARCHAR(32) NOT NULL UNIQUE,occurred_at VARCHAR(40) NOT"
+                            + " NULL,user_id VARCHAR(32) NOT NULL,user_name VARCHAR(80) NOT"
+                            + " NULL,identity_hash VARCHAR(64) NOT NULL,mechanism VARCHAR(16) NOT"
+                            + " NULL,outcome VARCHAR(16) NOT NULL)");
+            db.update(
+                    "INSERT INTO os_migration(version,name) VALUES(12,?)",
+                    "authentication event journal");
         }
     }
 

@@ -38,10 +38,135 @@ abstract class WorkflowSupport {
                             "os_recovery",
                             "os_record_access",
                             "os_group_member",
-                            "os_auth_attempt")) db.update("DELETE FROM " + table);
+                            "os_auth_attempt",
+                            "os_auth_event")) db.update("DELETE FROM " + table);
             db.update("DELETE FROM os_user WHERE name<>?", "admin");
             db.connection.commit();
         }
+    }
+
+    @Test
+    void authenticationEventsAreDurableRestrictedSanitizedAndBounded() throws Exception {
+        String api = "/api/openservice/authentication-events";
+        assertEquals(401, get(api, null).statusCode());
+        account("AuthJournal", "agent");
+        account("JournalReader", "reader");
+        login("admin");
+        try (var db = store.open()) {
+            db.update("DELETE FROM os_auth_event");
+            db.connection.commit();
+        }
+        assertEquals(List.of(), parsed(get(api, null)).get("result"));
+        assertTrue(
+                html(get("/admin/authentication-events", null))
+                        .contains("No authentication events recorded yet."));
+        assertEquals(400, get(api + "?x=1", null).statusCode());
+        assertEquals(405, json("POST", api, map(), auth("admin")).statusCode());
+        for (String name : List.of("AuthJournal", "JournalReader")) {
+            assertEquals(403, get(api, auth(name)).statusCode());
+            assertEquals(403, get("/admin/authentication-events", auth(name)).statusCode());
+        }
+        String raw = "Unknown\n<script>injected</script>", secret = "do-not-log-this-password";
+        for (String name : List.of("AuthJournal", raw, "Invalid" + (char) 0 + "Name")) {
+            String bad =
+                    "Basic "
+                            + Base64.getEncoder()
+                                    .encodeToString(
+                                            (name + ":" + secret).getBytes(StandardCharsets.UTF_8));
+            assertEquals(401, get("/api/openservice/me", bad).statusCode());
+        }
+        String hash = Passwords.tokenHash("AuthJournal");
+        try (var db = store.open()) {
+            db.update("UPDATE os_auth_attempt SET failures=5 WHERE identity_hash=?", hash);
+            db.connection.commit();
+        }
+        assertEquals(429, get("/api/openservice/me", auth("AuthJournal")).statusCode());
+        try (var db = store.open()) {
+            db.update("DELETE FROM os_auth_attempt WHERE identity_hash=?", hash);
+            db.connection.commit();
+        }
+        assertEquals(
+                400,
+                json("POST", "/api/now/table/incident", map(), auth("AuthJournal")).statusCode());
+        login("AuthJournal");
+        new Store(environment);
+        var events = objects(parsed(get(api, auth("admin"))).get("result"));
+        assertTrue(
+                events.stream()
+                        .allMatch(e ->
+                                e.keySet()
+                                        .equals(
+                                                Set.of(
+                                                        "event_id",
+                                                        "occurred_at",
+                                                        "user_id",
+                                                        "user_name",
+                                                        "identity_hash",
+                                                        "mechanism",
+                                                        "outcome"))));
+        var own = events.stream().filter(e -> e.get("user_name").equals("AuthJournal")).toList();
+        assertTrue(own.stream().anyMatch(e -> e.get("outcome").equals("failed")));
+        assertTrue(own.stream().anyMatch(e -> e.get("outcome").equals("limited")));
+        assertTrue(
+                own.stream()
+                        .anyMatch(e ->
+                                e.get("outcome").equals("succeeded")
+                                        && e.get("mechanism").equals("basic")));
+        assertTrue(
+                own.stream()
+                        .anyMatch(e ->
+                                e.get("outcome").equals("succeeded")
+                                        && e.get("mechanism").equals("browser")));
+        String unknownHash = Passwords.tokenHash(raw);
+        var unknown =
+                events.stream()
+                        .filter(e -> e.get("identity_hash").equals(unknownHash))
+                        .findFirst()
+                        .orElseThrow();
+        assertEquals("", unknown.get("user_name"));
+        assertEquals("", unknown.get("user_id"));
+        assertEquals(
+                2,
+                events.stream()
+                        .filter(e ->
+                                e.get("user_name").equals("") && e.get("outcome").equals("failed"))
+                        .count());
+        String serialized = JSON.writeValueAsString(events);
+        for (String excluded : List.of(raw, secret, PASSWORD, "Basic ", "csrf", "token"))
+            assertFalse(serialized.contains(excluded));
+        try (var db = store.open()) {
+            db.update("DELETE FROM os_auth_event");
+            try (var insert =
+                    db.statement(
+                            "INSERT INTO"
+                                + " os_auth_event(event_id,occurred_at,user_id,user_name,identity_hash,mechanism,outcome)"
+                                + " VALUES(?,?,?,?,?,?,?)")) {
+                for (int i = 0; i < 10000; i++) {
+                    insert.setString(1, String.format(Locale.ROOT, "%032x", i));
+                    insert.setString(2, now());
+                    insert.setString(3, "");
+                    insert.setString(4, "");
+                    insert.setString(5, hash);
+                    insert.setString(6, "basic");
+                    insert.setString(7, "failed");
+                    insert.addBatch();
+                }
+                insert.executeBatch();
+            }
+            db.connection.commit();
+        }
+        login("admin");
+        events = objects(parsed(get(api, null)).get("result"));
+        assertEquals(100, events.size());
+        assertEquals("succeeded", events.getFirst().get("outcome"));
+        try (var db = store.open()) {
+            assertEquals(10000, db.count("SELECT COUNT(*) FROM os_auth_event"));
+            assertEquals(
+                    0,
+                    db.count(
+                            "SELECT COUNT(*) FROM os_auth_event WHERE event_id=?", "0".repeat(32)));
+        }
+        assertEquals(200, get("/admin/authentication-events", null).statusCode());
     }
 
     @Test
@@ -106,7 +231,7 @@ abstract class WorkflowSupport {
                     ((Number)
                                     db.one(
                                                     "SELECT expires_at FROM os_auth_attempt WHERE"
-                                                        + " identity_hash=?",
+                                                            + " identity_hash=?",
                                                     key)
                                             .get("expires_at"))
                             .longValue());

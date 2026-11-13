@@ -193,7 +193,7 @@ public class WebController {
                                     StandardCharsets.UTF_8)
                             .split(":", 2);
             if (pair.length != 2) throw new Failure(401, "Invalid credentials");
-            var user = Authentication.verify(db, pair[0], pair[1]);
+            var user = Authentication.verify(db, pair[0], pair[1], "basic");
             if (user == null) throw new Failure(401, "Invalid credentials");
             return user;
         } catch (IllegalArgumentException error) {
@@ -316,7 +316,10 @@ public class WebController {
                 checkCsrf(c, c.parameter("csrf", ""));
                 var user =
                         Authentication.verify(
-                                c.db, c.parameter("username", ""), c.parameter("password", ""));
+                                c.db,
+                                c.parameter("username", ""),
+                                c.parameter("password", ""),
+                                "browser");
                 if (user == null) throw new Failure(401, "Incorrect username or password");
                 c.http.changeSessionId();
                 Collections.list(c.session.getAttributeNames()).forEach(c.session::removeAttribute);
@@ -594,6 +597,16 @@ public class WebController {
                     Invitations.revoke(
                             c.db, c.user.get("user_id").toString(), revokeInvite.group(1));
             return api ? json(map("result", result), 200) : redirect("/admin/invitations");
+        }
+        if (Set.of("/admin/authentication-events", "/api/openservice/authentication-events")
+                .contains(path)) {
+            method(method, "GET");
+            c.admin();
+            c.noQuery();
+            var events = AuthenticationEvents.latest(c.db);
+            return path.startsWith("/api/")
+                    ? json(map("result", events), 200)
+                    : view(c, "authentication-events", map("table", "security", "events", events));
         }
         if (Set.of("/admin/security-events", "/api/openservice/security-events").contains(path)) {
             method(method, "GET");

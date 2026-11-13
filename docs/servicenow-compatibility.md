@@ -177,3 +177,7 @@ Implemented local ADOPT-06 slice: administrator policy selection, current-member
 ## OS-039 — Persistent password-attempt throttling
 
 Implemented local ADOPT-08 slice: browser and Basic limits, durable counters, fixed automatic expiry, concurrent enforcement and bounded storage. Local fixed-window behavior differs from the vendor's configurable lockout scripts. See [cycle 14](platform-foundations.md) for evidence and exact counters.
+
+## OS-040 — Password-authentication event journal
+
+Implemented local ADOPT-09 slice: durable password-verification outcomes, administrator UI/API, secret exclusion and bounded rolling retention. It is distinct from native ServiceNow event names, SSO and full security monitoring. See [cycle 15](platform-foundations.md) for exact evidence.
