@@ -1,6 +1,6 @@
 # Latest platform verification
 
-Cycle 7: 307 tests; 1393/1393 lines, 764/764 branch outcomes, 103/103 methods; zero failures/errors/skips. Real SQLite/PostgreSQL/Chromium acceptance and the exact per-file gate passed. See [platform cycle evidence](platform-foundations.md). The following earlier measurements are historical.
+Cycle 8: 309 tests; 1405/1405 lines, 774/774 branch outcomes, 104/104 methods; zero failures/errors/skips. Real SQLite/PostgreSQL/Chromium acceptance and the exact per-file gate passed. See [platform cycle evidence](platform-foundations.md). The following earlier measurements are historical.
 
 # Java 27 validation — 13 November 2026
 

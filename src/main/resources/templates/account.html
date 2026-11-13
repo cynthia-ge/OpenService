@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{base :: layout(~{::main})}">
 <main>
-<section class="page-heading"><div><span class="eyebrow">YOUR ACCOUNT</span><h1>Account security</h1><p>Manage access to your account.</p></div></section>
+<section class="page-heading"><div><span class="eyebrow">YOUR ACCOUNT</span><h1>Account security</h1><p>Manage access to your account. Browser sessions end after 30 minutes of inactivity or eight hours from sign-in.</p></div></section>
 <section class="panel"><div class="panel-heading"><h2>Browser sessions</h2></div>
 <p>Sign out every browser signed in to your account, including this one. You can sign in again with your current password.</p>
 <form method="post" action="/account/sessions/revoke" class="record-form">

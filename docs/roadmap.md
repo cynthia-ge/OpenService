@@ -118,3 +118,5 @@ ADOPT-05 now also includes guarded local role changes with session revocation an
 ADOPT-05/08 now include self-service password changes with current-secret verification, concurrent-update protection and session revocation. Forgotten-password recovery, invitations, security-event audit, password screening and authentication throttling remain open. See platform cycle 6.
 
 ADOPT-09 now includes a transactional lifecycle-event journal and administrator UI/API with secret exclusion. Authentication attempts, retention/export, tamper-resistant storage and SIEM forwarding remain open. See platform cycle 7.
+
+ADOPT-08 now includes an eight-hour absolute browser-session limit, explicit 30-minute servlet idle timeout and fail-closed timestamp validation. MFA, throttling, password screening, distributed-session operations and evaluator-specific policy remain open. See platform cycle 8.

@@ -149,3 +149,7 @@ Implemented local ADOPT-05/08 slice: current-secret verification, bounded passwo
 ## OS-032 — Account lifecycle security journal
 
 Implemented local ADOPT-09 slice: transactionally persisted successful account changes with stable attribution, sanitized details, administrator UI/API and a deterministic 100-event window. Native sys_audit_role/identity plugins, login logging and tamper-resistant archives are not claimed. See [cycle 7](platform-foundations.md).
+
+## OS-033 — Absolute browser-session expiration
+
+Implemented local ADOPT-08 slice: server-side authentication age, an exclusive eight-hour cutoff, invalidation and fresh-login recovery, plus explicit servlet idle configuration. Eight hours is a local policy and does not claim ServiceNow property/default parity. See [cycle 8](platform-foundations.md).

@@ -39,6 +39,49 @@ class ControllerBoundaryTest {
     }
 
     @Test
+    void expiredSessionsAreInvalidatedBeforeRoutingAndFreshLoginRecovers() throws Exception {
+        var instance = store();
+        var controller = new WebController(instance);
+        String id;
+        try (var db = instance.open()) {
+            id = db.one("SELECT user_id FROM os_user WHERE name='admin'").get("user_id").toString();
+        }
+        for (String path : List.of("/api/openservice/me", "/account")) {
+            var request = request("GET", path);
+            request.removeHeader("Authorization");
+            var old = (MockHttpSession) request.getSession();
+            old.setAttribute("user", id);
+            old.setAttribute("auth_revision", 0L);
+            old.setAttribute(
+                    "authenticated_at",
+                    System.currentTimeMillis() - SessionLifetime.MAX_AGE_MILLIS);
+            assertEquals(path.startsWith("/api/") ? 401 : 302, dispatch(controller, request));
+            assertTrue(old.isInvalid());
+            assertNull(request.getSession().getAttribute("user"));
+            String csrf = request.getSession().getAttribute("csrf").toString();
+            var login = new MockHttpServletRequest("POST", "/login");
+            login.setSession((MockHttpSession) request.getSession());
+            login.addParameter("csrf", csrf);
+            login.addParameter("username", "admin");
+            login.addParameter("password", WorkflowSupport.PASSWORD);
+            assertEquals(302, dispatch(controller, login));
+            assertTrue(
+                    SessionLifetime.valid(
+                            login.getSession().getAttribute("authenticated_at"),
+                            System.currentTimeMillis()));
+            var restored = new MockHttpServletRequest("GET", "/api/openservice/me");
+            restored.setSession((MockHttpSession) login.getSession());
+            assertEquals(200, dispatch(controller, restored));
+        }
+        var basic = request("GET", "/api/openservice/me");
+        basic.getSession().setAttribute("user", id);
+        basic.getSession().setAttribute("auth_revision", 0L);
+        // Pre-upgrade sessions have no authenticated_at timestamp; Basic still reauthenticates.
+        assertEquals(200, dispatch(controller, basic));
+        assertNull(basic.getSession().getAttribute("user"));
+    }
+
+    @Test
     void unusualHttpInputsRespectAuthenticationAndBounds() throws Exception {
         var instance = store();
         var controller = new WebController(instance);
@@ -63,6 +106,7 @@ class ControllerBoundaryTest {
                                     .get("user_id"));
         }
         empty.getSession().setAttribute("auth_revision", 0L);
+        empty.getSession().setAttribute("authenticated_at", System.currentTimeMillis());
         empty.addHeader("X-CSRF-Token", "known-csrf");
         empty.setContentType("application/json");
         empty.setContent(

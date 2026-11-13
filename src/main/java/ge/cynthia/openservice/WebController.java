@@ -116,9 +116,17 @@ public class WebController {
                                     "SELECT * FROM os_user WHERE user_id=? AND active=1",
                                     session.getAttribute("user"));
             if (user != null
-                    && !Objects.equals(
-                            session.getAttribute("auth_revision"),
-                            ((Number) user.get("auth_revision")).longValue())) user = null;
+                    && (!Objects.equals(
+                                    session.getAttribute("auth_revision"),
+                                    ((Number) user.get("auth_revision")).longValue())
+                            || !SessionLifetime.valid(
+                                    session.getAttribute("authenticated_at"),
+                                    System.currentTimeMillis()))) {
+                session.invalidate();
+                session = request.getSession(true);
+                session.setAttribute("csrf", csrf());
+                user = null;
+            }
             String authorization = request.getHeader("Authorization");
             if (!publicPath && authorization != null && !authorization.isEmpty())
                 user = authenticate(db, authorization);
@@ -255,6 +263,7 @@ public class WebController {
                 c.session.setAttribute("user", user.get("user_id"));
                 c.session.setAttribute(
                         "auth_revision", ((Number) user.get("auth_revision")).longValue());
+                c.session.setAttribute("authenticated_at", System.currentTimeMillis());
                 c.session.setAttribute("csrf", csrf());
                 return redirect("/");
             }

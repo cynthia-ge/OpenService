@@ -118,3 +118,7 @@ Inactive accounts cannot authenticate through login, existing browser sessions o
 ## Account security events
 
 Administrator-only GET `/api/openservice/security-events` returns `{"result":[...]}` containing at most 100 rows ordered by descending database sequence allocation. Fields: `event_id`, `occurred_at` (UTC), `actor_id`, `actor_name`, `target_id`, `target_name`, `action`, `detail`. No query arguments or event mutation methods are accepted. Supported successful events are `account.created`, `account.state_changed`, `account.role_changed`, `account.password_changed` and `account.sessions_revoked`. Only state/role events carry before/after values; creation carries the role. No password or session secret is stored. The administrator Security events page renders the same window. Older events persist but export/pagination, authentication-attempt logging and tamper-resistant archival remain open.
+
+## Browser-session lifetime
+
+Browser authentication has an eight-hour absolute lifetime from successful login, checked on every request, plus the configured 30-minute servlet inactivity timeout. Expired or pre-upgrade timestamp-less sessions require a fresh login (browser redirect/API 401). The expired server session is invalidated and CSRF state renewed. Activity cannot extend the absolute lifetime. Basic requests authenticate independently and do not renew a browser session.
