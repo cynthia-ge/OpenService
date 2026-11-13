@@ -79,3 +79,15 @@ QA round 1: reviewed both route patterns, unchanged captures/callers, empty-resu
 Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 264 tests pass, no skipped tests. Exact feature gate: `WebController.java`: 612/612 lines, 308/308 branches, 37/37 methods. Whole Java application: 1115/1115 lines, 608/608 branch outcomes, 89/89 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
 
 Only the existing bounded Table API subset is versioned. Other historical vendor-version differences, versioned Attachment/Aggregate APIs and complete vendor parity are not claimed. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.
+
+## Cycle 5: OS-020 — Empty and nonempty encoded-query predicates
+
+Fixed QA base: `cc24f6f4796d6ebc4433f0aadbd81c7a6b6e3a28`; branch `main`, clean starting tree. Blueprint A4(d). Australia operator reference defines ISEMPTY and ISNOTEMPTY as operand-free absence/presence tests. The first HTTP regression failed with unsupported-query 400 before implementation. OpenService specifies missing JSON keys, JSON null and empty strings as empty; whitespace is a value.
+
+SQLite/PostgreSQL acceptance covers missing/null/empty/whitespace/nonempty records, both operators, AND/order composition, filtering before pagination, full-selection aggregate counts, contradictory predicates and rejection of operands, unknown fields and OR syntax through both APIs.
+
+QA round 1: reviewed parser alternatives, SQL null/text semantics on both database expressions, whitelisted columns, bound values in combined predicates, pagination/count callers, regression assertions and docs. No new/reopened findings or repairs; required checks pass. Unresolved: none.
+
+Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 266 tests pass, no skipped tests. Exact feature gate: `Service.java`: 346/346 lines, 212/212 branches, 26/26 methods. Whole Java application: 1122/1122 lines, 616/616 branch outcomes, 89/89 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Service.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
+
+Stored-value predicates only; no display-value resolution, reference traversal, OR grammar or native scripting is added. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.

@@ -1104,4 +1104,92 @@ abstract class WorkflowSupport {
                     404,
                     get("/api/now/" + version + "/table/incident", auth("admin")).statusCode());
     }
+
+    String encoded(String query) {
+        return URLEncoder.encode(query, StandardCharsets.UTF_8);
+    }
+
+    List<Map<String, Object>> tableQuery(String query, String extra) throws Exception {
+        var response =
+                get(
+                        "/api/now/table/incident?sysparm_query=" + encoded(query) + extra,
+                        auth("admin"));
+        assertEquals(200, response.statusCode(), html(response));
+        return objects(parsed(response).get("result"));
+    }
+
+    void countQuery(String query, long count) throws Exception {
+        var response =
+                get(
+                        "/api/now/stats/incident?sysparm_count=true&sysparm_query="
+                                + encoded(query),
+                        auth("admin"));
+        assertEquals(200, response.statusCode(), html(response));
+        assertEquals(
+                Long.toString(count),
+                object(object(parsed(response).get("result")).get("stats")).get("count"));
+    }
+
+    @Test
+    void emptyPredicatesDistinguishMissingNullEmptyAndWhitespace() throws Exception {
+        var ids = new ArrayList<String>();
+        for (int i = 0; i < 5; i++) {
+            var created =
+                    json(
+                            "POST",
+                            "/api/now/table/incident",
+                            map(
+                                    "short_description",
+                                    i + " empty query",
+                                    "assigned_to",
+                                    List.of("missing", "null", "", " ", "alex").get(i)),
+                            auth("admin"));
+            assertEquals(201, created.statusCode());
+            ids.add(object(parsed(created).get("result")).get("sys_id").toString());
+        }
+        try (var db = store.open()) {
+            var missing = Service.record(db, "incident", ids.get(0));
+            object(missing.get("data")).remove("assigned_to");
+            Service.save(db, missing);
+            var nil = Service.record(db, "incident", ids.get(1));
+            object(nil.get("data")).put("assigned_to", null);
+            Service.save(db, nil);
+            db.connection.commit();
+        }
+        assertEquals(
+                ids.subList(0, 3),
+                tableQuery("assigned_toISEMPTY^ORDERBYshort_description", "").stream()
+                        .map(r -> r.get("sys_id"))
+                        .toList());
+        assertEquals(
+                ids.subList(3, 5),
+                tableQuery("assigned_toISNOTEMPTY^ORDERBYshort_description", "").stream()
+                        .map(r -> r.get("sys_id"))
+                        .toList());
+        assertEquals(
+                ids.get(1),
+                tableQuery(
+                                "assigned_toISEMPTY^priority=3^ORDERBYshort_description",
+                                "&sysparm_limit=1&sysparm_offset=1")
+                        .getFirst()
+                        .get("sys_id"));
+        countQuery("assigned_toISEMPTY", 3);
+        countQuery("assigned_toISNOTEMPTY", 2);
+        countQuery("assigned_toISEMPTY^assigned_toISNOTEMPTY", 0);
+        for (String query :
+                List.of(
+                        "assigned_toISEMPTYvalue",
+                        "assigned_toISNOTEMPTYvalue",
+                        "missingISEMPTY",
+                        "assigned_toISEMPTY^ORpriority=1"))
+            for (String endpoint :
+                    List.of(
+                            "/api/now/table/incident?",
+                            "/api/now/stats/incident?sysparm_count=true&"))
+                assertEquals(
+                        400,
+                        get(endpoint + "sysparm_query=" + encoded(query), auth("admin"))
+                                .statusCode(),
+                        query);
+    }
 }

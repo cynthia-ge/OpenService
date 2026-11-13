@@ -68,3 +68,7 @@ Success is 201 with `{result: <metadata>}` and `Location` pointing to the metada
 ## Versioned Table API routes
 
 The existing Table CRUD subset also accepts `/api/now/v1/table/{table}[/{sys_id}]` and `/api/now/v2/table/{table}[/{sys_id}]`. They share stored records, authentication, role/CSRF rules, input validation, field projection and revision checks. Location and pagination links retain the requested version. In accordance with the Australia reference, a v1 collection read with no returned records yields 404; v2 and unversioned collection reads return 200 with an empty result array. Unsupported versions return 404. These routes implement the documented local subset, not every historical behavior of either vendor API version. Versioned Attachment and Aggregate routes remain outside this slice.
+
+## Empty-value query predicates
+
+Table and count Aggregate APIs accept `fieldISEMPTY` and `fieldISNOTEMPTY`, with no operand. Missing JSON keys, JSON null and empty strings match ISEMPTY; whitespace and other stored text match ISNOTEMPTY. Predicates run in SQL before pagination/grouping/counting and combine with existing AND and ordering terms. Unknown fields, an appended operand, and unsupported OR syntax return 400. These are stored-value semantics; reference/display-value resolution and native scripting are not implied.

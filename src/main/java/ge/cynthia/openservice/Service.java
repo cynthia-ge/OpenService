@@ -275,7 +275,8 @@ public final class Service {
             }
             Matcher match =
                     Pattern.compile(
-                                    "([a-z_][a-z_0-9]*)(!=|=|LIKE|STARTSWITH|NOT IN|IN)(.*)",
+                                    "([a-z_][a-z_0-9]*)(!=|=|LIKE|STARTSWITH|NOT"
+                                        + " IN|IN|ISEMPTY|ISNOTEMPTY)(.*)",
                                     Pattern.DOTALL)
                             .matcher(term);
             if (!match.matches() || !columns.containsKey(match.group(1)))
@@ -283,7 +284,14 @@ public final class Service {
             String column = columns.get(match.group(1)),
                     op = match.group(2),
                     value = match.group(3);
-            if (op.equals("IN") || op.equals("NOT IN")) {
+            if (op.equals("ISEMPTY") || op.equals("ISNOTEMPTY")) {
+                if (!value.isEmpty())
+                    throw new Failure(400, "Empty predicates do not accept a value");
+                where.append(" AND COALESCE(")
+                        .append(column)
+                        .append(",'')")
+                        .append(op.equals("ISEMPTY") ? "=''" : "<>''");
+            } else if (op.equals("IN") || op.equals("NOT IN")) {
                 var members = Arrays.asList(value.split(",", -1));
                 if (members.size() > 100 || members.contains(""))
                     throw new Failure(
