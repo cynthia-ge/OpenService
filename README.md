@@ -60,9 +60,9 @@ For a first review with colleagues, follow the [evaluation walkthrough](docs/eva
 - Create/edit forms, summary search, pagination, record details and responsive navigation.
 - State transitions and administrator approval/rejection for changes, enforced in the API as well as the UI.
 - Administrator-only account creation and paginated account lists in the browser; administrator, agent and reader roles, password hashes, sessions, CSRF protection and authenticated Basic API access.
-- Activity notes, persistent attachments with metadata/list/download APIs, audit events and JSON export.
+- Activity notes, persistent attachments with binary/multipart upload, metadata/list/download and administrator deletion APIs, audit events and JSON export.
 - A shared schema registry used by validation, API services and generated forms.
-- A bounded Table API subset: CRUD, selected encoded-query operators, sorting, field projection and pagination.
+- A bounded Table API subset: CRUD on unversioned/v1/v2 routes, selected encoded-query operators, sorting, field projection, pagination, optional Link suppression and reads without total-count queries.
 - JSON/CSV migration with dry runs, all-or-nothing validation, existing-record skipping, retained IDs and source-payload export.
 - Cloud-specific Terraform foundations for AWS, GCP and Azure, backed by managed PostgreSQL.
 

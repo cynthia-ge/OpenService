@@ -47,7 +47,7 @@ Table and Aggregate APIs accept `fieldINa,b` and `fieldNOT INa,b` in sysparm_que
 
 ## Attachment API
 
-Authenticated `GET /api/now/attachment` lists metadata in `result`, with optional `sysparm_query` exact equality filters on `sys_id`, `file_name`, `table_name` and `table_sys_id`, joined by `^`. Pagination uses `sysparm_limit` (1–1000; default 1000) and nonnegative `sysparm_offset`. Field projection is not supported. Unknown/repeated parameters, malformed filters and unsupported fields return 400. Results exclude attachments whose parent record is absent.
+Authenticated `GET /api/now/attachment` lists metadata in `result`, with optional `sysparm_query` exact equality filters on `sys_id`, `file_name`, `table_name` and `table_sys_id`, joined by `^`, plus ordering on those fields. Pagination uses `sysparm_limit` (1–1000; default 1000) and nonnegative `sysparm_offset`. Field projection is not supported. Unknown/repeated parameters, malformed filters and unsupported fields return 400. Results exclude attachments whose parent record is absent.
 
 `GET /api/now/attachment/{sys_id}` returns one metadata object. `GET /api/now/attachment/{sys_id}/file` returns stored bytes using the recorded content type (legacy/browser uploads default to `application/octet-stream`), a sanitized attachment filename and an `X-Attachment-Metadata` JSON header. All local roles may read; unauthenticated API requests receive 401, missing/orphan attachments 404. Parent-record deletion removes its attachments. This is a bounded local read contract; binary upload is described below; attachment updates are not implemented. Browser attachment upload remains supported for agents and administrators.
 
@@ -88,3 +88,7 @@ For Table collection reads, `sysparm_suppress_pagination_header=true` omits the 
 ## Collection reads without a total-count query
 
 `sysparm_no_count=true` skips SQL COUNT(*) and omits X-Total-Count. The query reads at most limit+1 rows, returns at most limit, and uses the extra row to decide whether to emit a next-page link. As a local pagination policy, first/previous/next links are available when applicable and the last link is omitted because the total is unknown. Links retain no_count and other query parameters. Combining it with pagination-header suppression omits both headers. Omitted/false preserves normal counting and links. Strict boolean validation and existing filters/projection/limits/versioned empty-result rules still apply; the flag is collection-only. This removes the count query, not the cost of large offsets or filtering.
+
+## Attachment metadata ordering
+
+Attachment collection `sysparm_query` accepts `ORDERBYfield` and `ORDERBYDESCfield` for sys_id, file_name, table_name and table_sys_id. Multiple ordering terms and equality filters combine with ^. Ordering runs in SQL before limit/offset; sys_id ascending is the stable final tie breaker, and the default order remains sys_id ascending. Unknown/empty/injected fields, unsupported size_bytes ordering, malformed terms and repeated query parameters fail with 400. File bytes are unaffected. This does not add full Table encoded-query grammar to attachments.

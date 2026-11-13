@@ -1478,4 +1478,101 @@ abstract class WorkflowSupport {
                             .anyMatch(sql -> sql.toUpperCase(Locale.ROOT).contains("COUNT(")));
         }
     }
+
+    List<Object> attachmentIds(String query, String extra) throws Exception {
+        var response =
+                get("/api/now/attachment?sysparm_query=" + encoded(query) + extra, auth("admin"));
+        assertEquals(200, response.statusCode(), html(response));
+        return objects(parsed(response).get("result")).stream()
+                .map(row -> row.get("sys_id"))
+                .toList();
+    }
+
+    @Test
+    void attachmentOrderingIsStableFilteredAndAppliedBeforePaging() throws Exception {
+        String incident = add("incident").get("sys_id").toString(),
+                problem = add("problem").get("sys_id").toString();
+        var files = new ArrayList<Map<String, Object>>();
+        for (String[] item :
+                List.of(
+                        new String[] {incident, "incident", "zeta.txt"},
+                        new String[] {incident, "incident", "beta.txt"},
+                        new String[] {incident, "incident", "beta.txt"},
+                        new String[] {problem, "problem", "middle.txt"})) {
+            var response =
+                    request(
+                            "POST",
+                            binaryPath(item[0], item[2])
+                                    .replace("table_name=incident", "table_name=" + item[1]),
+                            new byte[] {1},
+                            "text/plain",
+                            auth("admin"));
+            assertEquals(201, response.statusCode());
+            files.add(object(parsed(response).get("result")));
+        }
+        Object z = files.get(0).get("sys_id"), m = files.get(3).get("sys_id");
+        var beta =
+                List.of(files.get(1).get("sys_id"), files.get(2).get("sys_id")).stream()
+                        .sorted(Comparator.comparing(Object::toString))
+                        .toList();
+        assertEquals(
+                List.of(beta.get(0), beta.get(1), m, z), attachmentIds("ORDERBYfile_name", ""));
+        assertEquals(
+                List.of(z, m, beta.get(0), beta.get(1)), attachmentIds("ORDERBYDESCfile_name", ""));
+        assertEquals(
+                List.of(z, beta.get(0), beta.get(1), m),
+                attachmentIds("ORDERBYtable_name^ORDERBYDESCfile_name", ""));
+        assertEquals(
+                List.of(m, beta.get(0), beta.get(1), z),
+                attachmentIds("ORDERBYDESCtable_name^ORDERBYfile_name", ""));
+        assertEquals(
+                List.of(beta.get(1)),
+                attachmentIds(
+                        "ORDERBYfile_name^file_name=beta.txt",
+                        "&sysparm_limit=1&sysparm_offset=1"));
+        assertEquals(
+                List.of(z, beta.get(0), beta.get(1)),
+                attachmentIds("table_name=incident^ORDERBYDESCfile_name", ""));
+        assertEquals(
+                files.stream()
+                        .map(row -> row.get("sys_id"))
+                        .sorted(Comparator.comparing(Object::toString).reversed())
+                        .toList(),
+                attachmentIds("ORDERBYDESCsys_id", ""));
+        assertEquals(
+                files.stream()
+                        .sorted(
+                                Comparator.comparing((Map<String, Object> row) ->
+                                                row.get("table_sys_id").toString())
+                                        .thenComparing(row -> row.get("sys_id").toString()))
+                        .map(row -> row.get("sys_id"))
+                        .toList(),
+                attachmentIds("ORDERBYtable_sys_id", ""));
+        assertEquals(List.of(), attachmentIds("ORDERBYfile_name", "&sysparm_offset=2147483647"));
+        for (String query :
+                List.of(
+                        "ORDERBY",
+                        "ORDERBYDESC",
+                        "ORDERBYunknown",
+                        "ORDERBYfile_name;DROP TABLE os_user",
+                        "ORDERBYsize_bytes",
+                        "ORDERBYfile_name^"))
+            assertEquals(
+                    400,
+                    get("/api/now/attachment?sysparm_query=" + encoded(query), auth("admin"))
+                            .statusCode(),
+                    query);
+        assertEquals(
+                400,
+                get(
+                                "/api/now/attachment?sysparm_query=ORDERBYfile_name&sysparm_query=ORDERBYsys_id",
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                401, get("/api/now/attachment?sysparm_query=ORDERBYfile_name", null).statusCode());
+        try (var db = store.open()) {
+            assertEquals(4, db.count("SELECT COUNT(*) FROM os_attachment"));
+            assertEquals(1, db.count("SELECT COUNT(*) FROM os_user"));
+        }
+    }
 }

@@ -739,6 +739,7 @@ public class WebController {
                             Service.number(
                                     c.parameter("sysparm_offset", "0"), 0, Integer.MAX_VALUE);
             var where = new ArrayList<String>();
+            var ordering = new ArrayList<String>();
             var parameters = new ArrayList<Object>();
             var columns =
                     Map.of(
@@ -753,6 +754,14 @@ public class WebController {
             String encoded = c.parameter("sysparm_query", "");
             if (!encoded.isEmpty())
                 for (String term : encoded.split("\\^", -1)) {
+                    if (term.startsWith("ORDERBY")) {
+                        boolean descending = term.startsWith("ORDERBYDESC");
+                        String field = term.substring(descending ? 11 : 7);
+                        if (!columns.containsKey(field))
+                            throw new Failure(400, "Unsupported attachment ordering field");
+                        ordering.add(columns.get(field) + (descending ? " DESC" : " ASC"));
+                        continue;
+                    }
                     int equals = term.indexOf('=');
                     if (equals < 0 || !columns.containsKey(term.substring(0, equals)))
                         throw new Failure(
@@ -762,6 +771,7 @@ public class WebController {
                     where.add(columns.get(term.substring(0, equals)) + "=?");
                     parameters.add(term.substring(equals + 1));
                 }
+            ordering.add("a.sys_id");
             parameters.add(limit);
             parameters.add(offset);
             var result = new ArrayList<Map<String, Object>>();
@@ -772,7 +782,9 @@ public class WebController {
                                     + (where.isEmpty()
                                             ? ""
                                             : " WHERE " + String.join(" AND ", where))
-                                    + " ORDER BY a.sys_id LIMIT ? OFFSET ?",
+                                    + " ORDER BY "
+                                    + String.join(",", ordering)
+                                    + " LIMIT ? OFFSET ?",
                             parameters.toArray())) result.add(metadata(c, row));
             return json(map("result", result), 200);
         }

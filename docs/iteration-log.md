@@ -13,9 +13,9 @@ Toolchain verified 13 November 2026: Java 27 is the latest GA feature release, a
 - Additional validation exercises request-size bounds without Content-Length, empty authorization with a valid session, HEAD, malformed Basic credentials, null filenames, unexpected service failures, database-close failures, malformed password hashes and configuration/CLI boundaries.
 - QA round 2: no new or reopened findings and no repairs after reviewing the accumulated migration and request-validation fixes. 248 tests pass; 1033/1033 lines, 560/560 branches and 88/88 methods; the exact-count gate passes all seven production files. Java 27 Docker build and PostgreSQL restart-persistence smoke checks pass. Request handling is separated from connection ownership, retaining try-with-resources suppression/closure behavior and avoiding duplicate compiler-generated null-resource branches. No coverage exclusions were added.
 
-## Candidate sequence
+## Completed sequence
 
-These are bounded planned slices, not claims of completed capabilities. Each iteration records its own fixed QA base, contract, acceptance, exact coverage and clean review before committing.
+All ten bounded slices below passed their acceptance and exact coverage gates and ended with a clean QA round. Each cycle records its fixed base, contract, measurements and findings below. The Java migration baseline is separate from the ten feature commits.
 
 | Iteration | Gap | Observable capability | Evidence |
 |---|---|---|---|
@@ -139,3 +139,15 @@ QA round 1: reviewed SQL control flow, limit-plus-one bound, trimming before ser
 Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 276 tests pass, no skipped tests. Exact feature gate: `Service.java`: 362/362 lines, 226/226 branches, 27/27 methods; `WebController.java`: 614/614 lines, 314/314 branches, 37/37 methods. Whole Java application: 1140/1140 lines, 636/636 branch outcomes, 90/90 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Service.java`, `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
 
 First/previous/next without last is an explicit local policy when totals are unknown. Count omission does not remove filtering or large-offset costs. Other Table API limitations remain unchanged. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.
+
+## Cycle 10: OS-025 — Stable attachment metadata ordering
+
+Fixed QA base: `082b55401c46b3a036c61d10bfe3bc3757e3fd7d`; branch `main`, clean starting tree. Blueprint A4(a). Australia Attachment API list documentation supports ORDERBY/ORDERBYDESC terms in sysparm_query. OpenService supports its four existing identifier/name filter fields and adds sys_id as a stable tie breaker. The new populated-list regression failed with 400 before implementation.
+
+Both database suites verify ascending/descending filenames, duplicate-name stable ties, multi-key table/name ordering, ID and parent-ID ordering, mixed equality filters, sorting before offset/limit, empty pages, rejected unknown/empty/injected/malformed fields, duplicate parameters and authentication. Mutation counts remain unchanged. Final Java 27 Docker/PostgreSQL acceptance verifies packaging, readiness, persistent records and attachment bytes after container replacement, versioned routes, new query/header behavior and audited deletion.
+
+QA round 1: found one stale historical contract expecting ORDERBYfile_name to be rejected. Both SQLite and PostgreSQL reproduced the intentional 400-to-200 behavior change. Updated that single fixture to assert an empty successful result; retained all 113 cases and added populated ordering assertions. Round 2: reviewed the complete diff, ordering whitelist, SQL binding/filter order, stable tie behavior, pagination, changed fixture and docs. No new/reopened defects or repairs; all required checks pass. Unresolved: none.
+
+Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 278 tests pass, no skipped tests. Exact feature gate: `WebController.java`: 624/624 lines, 322/322 branches, 37/37 methods. Whole Java application: 1150/1150 lines, 644/644 branch outcomes, 90/90 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
+
+Ordering is limited to sys_id, file_name, table_name and table_sys_id. It does not add size/content ordering, full Table query grammar, attachment updates or vendor-instance conformance. Remaining candidates include SSO/ACLs, managed schema migrations, native scripting and numeric aggregates; only this slice is implemented in this cycle.
