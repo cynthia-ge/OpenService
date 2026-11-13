@@ -48,6 +48,60 @@ class BrowserTest {
     }
 
     @Test
+    void administratorSearchesAccountsAndKeepsFiltersWhilePaging() throws Exception {
+        String prefix = "FindBrowser" + id().substring(0, 8);
+        try (var db = store.open()) {
+            String password =
+                    db.one("SELECT password FROM os_user WHERE name='admin'")
+                            .get("password")
+                            .toString();
+            for (int i = 0; i < 30; i++)
+                db.update(
+                        "INSERT INTO os_user(name,password,role,user_id,active) VALUES(?,?,?,?,?)",
+                        prefix + String.format(Locale.ROOT, "%02d", i),
+                        password,
+                        "reader",
+                        id(),
+                        1);
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var context = browser.newContext()) {
+            var page = context.newPage();
+            login(page, "admin");
+            page.getByRole(
+                            AriaRole.LINK,
+                            new Page.GetByRoleOptions()
+                                    .setName(java.util.regex.Pattern.compile("Accounts$")))
+                    .click();
+            page.getByLabel("Find username").fill(prefix);
+            page.getByLabel("Filter role", new Page.GetByLabelOptions().setExact(true))
+                    .selectOption("reader");
+            page.getByLabel("Filter status", new Page.GetByLabelOptions().setExact(true))
+                    .selectOption("active");
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Find accounts"))
+                    .click();
+            page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName("Next →")).click();
+            assertTrue(page.url().contains("role=reader"));
+            assertEquals(prefix, page.getByLabel("Find username").inputValue());
+            assertEquals(
+                    6,
+                    page.getByRole(
+                                    AriaRole.TABLE,
+                                    new Page.GetByRoleOptions().setName("Workspace accounts"))
+                            .getByRole(AriaRole.ROW)
+                            .count());
+            page.getByLabel("Find username").fill("nobody" + prefix);
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Find accounts"))
+                    .click();
+            page.getByText("No accounts match these filters.").waitFor();
+            page.setViewportSize(390, 844);
+            assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth<=innerWidth"));
+        }
+    }
+
+    @Test
     void administratorInvestigatesAFailedLoginInTheBrowser() throws Exception {
         String name = "JournalBrowser" + id().substring(0, 8);
         try (var db = store.open()) {

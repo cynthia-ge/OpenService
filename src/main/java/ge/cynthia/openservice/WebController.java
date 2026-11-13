@@ -685,8 +685,22 @@ public class WebController {
         Matcher accountPage = Pattern.compile("/admin/accounts/([0-9a-f]{32})").matcher(path);
         if (accountPage.matches()) return accountDetail(c, accountPage.group(1), method);
         if (path.equals("/api/openservice/users")) {
-            method(method, "POST");
+            method(method, "GET", "POST");
             c.admin();
+            if (method.equals("GET")) {
+                var directory = AccountDirectory.list(c.db, queryArguments(c));
+                return json(
+                        map(
+                                "result",
+                                directory.get("accounts"),
+                                "page",
+                                directory.get("page"),
+                                "pages",
+                                directory.get("pages"),
+                                "total",
+                                directory.get("total")),
+                        200);
+            }
             return json(
                     map(
                             "result",
@@ -1052,13 +1066,8 @@ public class WebController {
         method(method, "GET", "POST");
         c.admin();
         var args = queryArguments(c);
-        if (!Set.of("page").containsAll(args.keySet())
-                || !args.getOrDefault("page", "1").matches("[1-9][0-9]{0,5}"))
-            throw new Failure(400, "Use a single positive page parameter of at most six digits");
-        int page = Integer.parseInt(args.getOrDefault("page", "1"));
-        long total = c.db.count("SELECT COUNT(*) FROM os_user"),
-                pages = Math.max(1, (total + 24) / 25);
-        if (page > pages) throw new Failure(400, "Page is outside the account list");
+        var directory = AccountDirectory.list(c.db, args);
+        int page = (Integer) directory.get("page");
         var values = map("name", "", "role", "reader");
         String error = null;
         if (method.equals("POST")) {
@@ -1078,36 +1087,17 @@ public class WebController {
                 c.session.setAttribute(
                         "flash",
                         "Account for " + account.get("name") + " created. They can now sign in.");
-                return redirect("/admin/accounts?page=" + page);
+                args.put("page", Integer.toString(page));
+                return redirect("/admin/accounts?" + query(args));
             } catch (Failure failure) {
                 if (failure.status != 400) throw failure;
                 error = failure.getMessage();
             }
         }
-        var result =
-                view(
-                        c,
-                        "accounts",
-                        map(
-                                "table",
-                                "accounts",
-                                "accounts",
-                                c.db.all(
-                                        "SELECT user_id,name,role,active FROM os_user ORDER BY name"
-                                                + " LIMIT 25 OFFSET ?",
-                                        (page - 1) * 25),
-                                "total",
-                                total,
-                                "page",
-                                page,
-                                "pages",
-                                pages,
-                                "roles",
-                                Service.ROLES,
-                                "values",
-                                values,
-                                "error",
-                                error));
+        var model =
+                map("table", "accounts", "roles", Service.ROLES, "values", values, "error", error);
+        model.putAll(directory);
+        var result = view(c, "accounts", model);
         if (error != null) result.setStatus(HttpStatus.BAD_REQUEST);
         return result;
     }

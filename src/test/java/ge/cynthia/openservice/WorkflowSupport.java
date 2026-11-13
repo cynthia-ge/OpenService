@@ -46,6 +46,115 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void accountDirectorySearchFiltersAndPaginationStayRestrictedAndConsistent() throws Exception {
+        String api = "/api/openservice/users";
+        assertEquals(401, get(api, null).statusCode());
+        account("DirectoryAgent", "agent");
+        account("DirectoryReader", "reader");
+        for (String name : List.of("DirectoryAgent", "DirectoryReader")) {
+            assertEquals(403, get(api + "?q=admin", auth(name)).statusCode());
+            assertEquals(403, get("/admin/accounts?q=admin", auth(name)).statusCode());
+        }
+        try (var db = store.open()) {
+            String password =
+                    db.one("SELECT password FROM os_user WHERE name='admin'")
+                            .get("password")
+                            .toString();
+            for (int i = 0; i < 30; i++)
+                db.update(
+                        "INSERT INTO os_user(name,password,role,user_id,active) VALUES(?,?,?,?,?)",
+                        String.format(Locale.ROOT, "SearchPerson%02d", i),
+                        password,
+                        i == 1 ? "agent" : "reader",
+                        id(),
+                        i == 0 ? 0 : 1);
+            db.connection.commit();
+        }
+        String query = "?q=searchperson&role=reader&status=active";
+        var first = parsed(get(api + query, auth("admin")));
+        assertEquals(28, ((Number) first.get("total")).intValue());
+        assertEquals(2, ((Number) first.get("pages")).intValue());
+        var rows = objects(first.get("result"));
+        assertEquals(25, rows.size());
+        assertEquals("SearchPerson02", rows.getFirst().get("name"));
+        assertEquals(Set.of("user_id", "name", "role", "active"), rows.getFirst().keySet());
+        var second = objects(parsed(get(api + query + "&page=2", auth("admin"))).get("result"));
+        assertEquals(3, second.size());
+        assertEquals("SearchPerson27", second.getFirst().get("name"));
+        assertEquals(
+                1,
+                objects(
+                                parsed(get(api + "?q=SearchPerson&status=inactive", auth("admin")))
+                                        .get("result"))
+                        .size());
+        assertEquals(
+                "SearchPerson01",
+                objects(
+                                parsed(get(api + "?q=SearchPerson&role=agent", auth("admin")))
+                                        .get("result"))
+                        .getFirst()
+                        .get("name"));
+        for (String suffix :
+                List.of("?q=%25", "?q=_", "?q=%27%20OR%201%3D1", "?q=" + "x".repeat(80)))
+            assertEquals(List.of(), parsed(get(api + suffix, auth("admin"))).get("result"));
+        for (String suffix :
+                List.of(
+                        "?q=" + "x".repeat(81),
+                        "?q=%00",
+                        "?role=owner",
+                        "?status=disabled",
+                        "?page=0",
+                        "?page=1000000",
+                        "?q=SearchPerson&page=3",
+                        "?x=1",
+                        "?q=a&q=b")) {
+            assertEquals(400, get(api + suffix, auth("admin")).statusCode(), suffix);
+            assertEquals(400, get("/admin/accounts" + suffix, auth("admin")).statusCode(), suffix);
+        }
+        assertTrue(
+                html(get("/admin/accounts?q=nomatchingperson", auth("admin")))
+                        .contains("No accounts match these filters."));
+        String page = html(get("/admin/accounts" + query, auth("admin")));
+        assertTrue(page.contains("Page 1 of 2"));
+        assertTrue(page.contains("q=searchperson&amp;role=reader&amp;status=active"));
+        String csrf = login("admin");
+        var created =
+                form(
+                        "/admin/accounts" + query,
+                        map(
+                                "name",
+                                "SearchPersonAdded",
+                                "role",
+                                "reader",
+                                "password",
+                                PASSWORD,
+                                "csrf",
+                                csrf),
+                        null);
+        assertEquals(302, created.statusCode());
+        assertTrue(
+                created.headers().firstValue("Location").orElseThrow().contains("q=searchperson"));
+        assertEquals(
+                29, ((Number) parsed(get(api + query, auth("admin"))).get("total")).intValue());
+        assertEquals(
+                400,
+                form(
+                                "/admin/accounts" + query,
+                                map(
+                                        "name",
+                                        "bad_name",
+                                        "role",
+                                        "reader",
+                                        "password",
+                                        PASSWORD,
+                                        "csrf",
+                                        csrf),
+                                null)
+                        .statusCode());
+        assertEquals(405, json("PATCH", api, map(), auth("admin")).statusCode());
+    }
+
+    @Test
     void authenticationEventsAreDurableRestrictedSanitizedAndBounded() throws Exception {
         String api = "/api/openservice/authentication-events";
         assertEquals(401, get(api, null).statusCode());

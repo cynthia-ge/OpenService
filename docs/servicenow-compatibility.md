@@ -181,3 +181,7 @@ Implemented local ADOPT-08 slice: browser and Basic limits, durable counters, fi
 ## OS-040 — Password-authentication event journal
 
 Implemented local ADOPT-09 slice: durable password-verification outcomes, administrator UI/API, secret exclusion and bounded rolling retention. It is distinct from native ServiceNow event names, SSO and full security monitoring. See [cycle 15](platform-foundations.md) for exact evidence.
+
+## OS-041 — Searchable account administration
+
+Implemented local ADOPT-03/05 slice: administrator username/role/state filters, matching counts, paginated UI/API and sanitized output. It does not reproduce vendor encoded queries or delegated user administration. See [cycle 16](platform-foundations.md) for acceptance and exact counters.
