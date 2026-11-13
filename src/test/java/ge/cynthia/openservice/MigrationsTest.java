@@ -43,6 +43,79 @@ class MigrationsTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    void passwordRecoveryIsAtomicAndSingleUseUnderConcurrency(boolean postgres) throws Exception {
+        var store = new Store(configuration(postgres));
+        String token, target;
+        try (var db = store.open()) {
+            target =
+                    db.one("SELECT user_id FROM os_user WHERE name='admin'")
+                            .get("user_id")
+                            .toString();
+            token =
+                    RecoveryLinks.issue(
+                                    db,
+                                    target,
+                                    target,
+                                    Values.map("current_password", "migration-test-password"))
+                            .get("reset_path")
+                            .toString()
+                            .substring(9);
+            db.connection.commit();
+        }
+        try (var db = store.open()) {
+            RecoveryLinks.recover(db, token, "rolled-back-password");
+            db.connection.rollback();
+            assertTrue(
+                    Passwords.matches(
+                            db.one("SELECT password FROM os_user WHERE user_id=?", target)
+                                    .get("password")
+                                    .toString(),
+                            "migration-test-password"));
+            assertEquals(1, db.count("SELECT COUNT(*) FROM os_recovery"));
+            assertEquals(1, db.count("SELECT COUNT(*) FROM os_security_event"));
+        }
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var start = new CountDownLatch(1);
+            List<Future<Integer>> results = new ArrayList<>();
+            for (int n = 0; n < 2; n++)
+                results.add(
+                        executor.submit(() -> {
+                            start.await();
+                            try (var db = store.open()) {
+                                try {
+                                    RecoveryLinks.recover(db, token, "accepted-reset-password");
+                                    db.connection.commit();
+                                    return 200;
+                                } catch (Values.Failure failure) {
+                                    db.connection.rollback();
+                                    return failure.status;
+                                }
+                            }
+                        }));
+            start.countDown();
+            var statuses =
+                    List.of(
+                            results.get(0).get(30, TimeUnit.SECONDS),
+                            results.get(1).get(30, TimeUnit.SECONDS));
+            assertEquals(1, statuses.stream().filter(status -> status == 200).count());
+            assertEquals(1, statuses.stream().filter(status -> status == 400).count());
+        }
+        try (var db = store.open()) {
+            assertEquals(0, db.count("SELECT COUNT(*) FROM os_recovery"));
+            assertEquals(2, db.count("SELECT COUNT(*) FROM os_security_event"));
+            var user =
+                    db.one(
+                            "SELECT password,auth_revision,active FROM os_user WHERE user_id=?",
+                            target);
+            assertTrue(
+                    Passwords.matches(user.get("password").toString(), "accepted-reset-password"));
+            assertEquals(1L, ((Number) user.get("auth_revision")).longValue());
+            assertEquals(1, ((Number) user.get("active")).intValue());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void onlyOneConcurrentInvitationAcceptanceCreatesAnAccount(boolean postgres) throws Exception {
         var store = new Store(configuration(postgres));
         String token;

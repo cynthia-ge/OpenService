@@ -1,8 +1,14 @@
 # OpenService adoption roadmap and build order
 
-Reviewed 13 November 2026 against application commit `9e636aa`, the implementation, tests, configuration, deployment templates and compatibility ledger. This is the implementation priority document for future OpenService work. The [compatibility ledger](servicenow-compatibility.md) describes supported behavior; this roadmap determines what to build next.
+Initial assessment: 13 November 2026 at `9e636aa`, refreshed below through platform cycle 10 using implementation, test and container evidence. This is the implementation priority document for future OpenService work. The [compatibility ledger](servicenow-compatibility.md) describes supported behavior; this roadmap determines what to build next.
 
-## Current assessment
+## Current assessment after the foundation tranche
+
+The ten implementation cycles now provide versioned upgrades, stable user identities, revocable and time-bounded browser sessions, account activation/role management, password changes, lifecycle security events, manual invitation acceptance and administrator-assisted recovery. Evidence and exact per-cycle coverage are in [platform foundations](platform-foundations.md) and [validation](validation.md).
+
+M0 remains the supported scope: a disposable local walkthrough with synthetic data. M1–M3 remain unmet. The next ready work is resource/field visibility and memberships (ADOPT-03/06), authentication abuse controls/MFA policy (ADOPT-08), and reliable verified delivery (ADOPT-07/04/05). Security-event retention/export and authentication-attempt logging remain partial (ADOPT-09). Restore/upgrade drills, monitoring, workload evidence and named support ownership remain pilot gates. Manual bearer links do not establish verified email, enterprise identity or customer isolation.
+
+## Starting assessment at `9e636aa` (historical)
 
 OpenService supports a local, disposable walkthrough with synthetic data. It does not yet provide a complete invitation/onboarding system or the controls needed for an independently operated team pilot. A shared instance is not ready for real customer or employee data on the evidence currently available.
 
@@ -45,7 +51,7 @@ Use a dedicated instance for one organization as the provisional first-evaluatio
 
 All P0 items are M1 prerequisites. An entry is a workstream; implementation must split it into bounded, independently testable changes without exposing a partially protected flow.
 
-| ID | Workstream and current state | Required completion evidence |
+| ID | Workstream and starting state | Required completion evidence |
 |---|---|---|
 | ADOPT-01 | Evaluation scope and permission model — unspecified. Personas and customer/team boundaries are not defined. Maps to OS-005/014. | Record administrator, agent, requester and reviewer journeys; define organization/team ownership, visibility and administrative scope. Produce a resource/action matrix covering UI, APIs, counts, exports, notes, audit and attachment downloads. Identify which personas the first pilot actually requires. |
 | ADOPT-02 | Versioned schema upgrades — partial. Bootstrap and one additive attachment upgrade exist. OS-002/014. | Repeatable, serialized migrations preserve current records, hashes, events and files on SQLite/PostgreSQL. Test upgrade from an existing installation, rerun, concurrent startup and failure recovery. Document backup and rollback/roll-forward procedures. |
@@ -61,7 +67,7 @@ All P0 items are M1 prerequisites. An entry is a workstream; implementation must
 
 These are pilot/production workstreams, not claims about requirements already agreed with British Telecom. Select the precise workflow with the evaluator, but do not waive the identity, isolation, recovery or evidence gates for real-data use.
 
-| ID | Workstream and current state | Required completion evidence |
+| ID | Workstream and starting state | Required completion evidence |
 |---|---|---|
 | ADOPT-10 | Operational workflow and data integrity — partial record CRUD/local states. Real assignment, typed references, approval records and fulfillment are incomplete. OS-002/006/009/013. | Demonstrate intake → validated assignment → work/approval → resolution/reopen for the chosen service. Validate active assignee/group eligibility, relationships, allowed state transitions, timestamps and concurrent updates. Provide queue/ownership views and the operational reports needed for that workflow. Separate labels stored in JSON from functioning domain relationships. |
 | ADOPT-11 | SLA timers and escalation — missing. OS-006/013. | Defined response/resolution clocks, business calendars/time zones, pause/resume and escalation rules. Deterministic clock tests and restart/retry tests prove deadlines survive outages without duplicate escalation. Depends on durable jobs and actual assignments. |
@@ -86,7 +92,7 @@ ADOPT-20 covers optional social polish: avatars, reactions, richer profiles, dis
 4. Implement ADOPT-07 delivery and ADOPT-04 invitation acceptance, followed by the rest of ADOPT-05 recovery/administration. End with a complete admin → invite → recipient-set credentials → scoped work → deactivate journey.
 5. Close the remaining P0 acceptance cases and run the M1 evaluation gate. Then work through the agreed P1 service/pilot scope and recovery/operational evidence.
 
-The next code work should be the migration and identity foundation, after recording the permission model. Split each workstream into bounded slices with its dependency, production scope, behavior, tests and acceptance evidence. Do not treat a database table, unused helper or UI placeholder as a completed capability. No calendar estimate or evaluator approval is implied by this sequence.
+At the starting assessment, migration and identity foundations were the next work after recording the permission model. Use the current assessment above for the next selection. Split each workstream into bounded slices with its dependency, production scope, behavior, tests and acceptance evidence. Do not treat a database table, unused helper or UI placeholder as a completed capability. No calendar estimate or evaluator approval is implied by this sequence.
 
 ## Rules for subsequent development cycles
 
@@ -122,3 +128,5 @@ ADOPT-09 now includes a transactional lifecycle-event journal and administrator 
 ADOPT-08 now includes an eight-hour absolute browser-session limit, explicit 30-minute servlet idle timeout and fail-closed timestamp validation. MFA, throttling, password screening, distributed-session operations and evaluator-specific policy remain open. See platform cycle 8.
 
 ADOPT-04 is now partial: manual single-use, 24-hour invitation issuance, replacement/revocation and recipient-set credentials are implemented with audit and concurrency evidence. Reliable email delivery, address verification, membership/resource scope, provider-based onboarding and abuse controls remain open; M1 is still unmet. See platform cycle 9.
+
+ADOPT-05/08/09 now include administrator-assisted, reauthenticated 15-minute recovery links with target/issuer revision binding, explicit revocation, atomic credential/session replacement and lifecycle events. Manual recipient verification/delivery, no-administrator recovery, throttling and full identity integrations remain open. See platform cycle 10. All ten cycles are local commits; no publishing or deployment is authorized by this tranche.

@@ -111,7 +111,7 @@ public class WebController {
             String path = request.getRequestURI(), method = request.getMethod();
             boolean publicPath =
                     Set.of("/healthz", "/login", "/static/app.css").contains(path)
-                            || path.matches("/join/[A-Za-z0-9_-]{32}");
+                            || path.matches("/(?:join|recover)/[A-Za-z0-9_-]{32}");
             var user =
                     session.getAttribute("user") == null
                             ? null
@@ -248,6 +248,36 @@ public class WebController {
                         "text/css; charset=utf-8",
                         200);
             }
+        }
+        Matcher recovering = Pattern.compile("/recover/([A-Za-z0-9_-]{32})").matcher(path);
+        if (recovering.matches()) {
+            method(method, "GET", "POST");
+            c.noQuery();
+            c.uniqueQuery();
+            var recovery = RecoveryLinks.describe(c.db, recovering.group(1));
+            String error = null;
+            int status = 200;
+            if (method.equals("POST")) {
+                checkCsrf(c, c.parameter("csrf", ""));
+                try {
+                    RecoveryLinks.recover(c.db, recovering.group(1), c.parameter("password", ""));
+                    c.session.invalidate();
+                    return redirect("/login");
+                } catch (Failure failure) {
+                    error = failure.getMessage();
+                    status = failure.status;
+                }
+            }
+            return new ModelAndView(
+                    "recover",
+                    map(
+                            "recovery",
+                            recovery,
+                            "csrf",
+                            c.session.getAttribute("csrf"),
+                            "error",
+                            error),
+                    HttpStatus.valueOf(status));
         }
         Matcher joining = Pattern.compile("/join/([A-Za-z0-9_-]{32})").matcher(path);
         if (joining.matches()) {
@@ -501,6 +531,39 @@ public class WebController {
             return path.startsWith("/api/")
                     ? json(map("result", events), 200)
                     : view(c, "security-events", map("table", "security", "events", events));
+        }
+        Matcher recoveryIssue =
+                Pattern.compile("/api/openservice/users/([0-9a-f]{32})/recovery").matcher(path);
+        if (recoveryIssue.matches()) {
+            method(method, "POST");
+            c.admin();
+            c.noQuery();
+            return json(
+                    map(
+                            "result",
+                            RecoveryLinks.issue(
+                                    c.db,
+                                    c.user.get("user_id").toString(),
+                                    recoveryIssue.group(1),
+                                    body(c))),
+                    201);
+        }
+        Matcher recoveryRevoke =
+                Pattern.compile(
+                                "/(?:admin/accounts|api/openservice/users)/([0-9a-f]{32})/recovery/revoke")
+                        .matcher(path);
+        if (recoveryRevoke.matches()) {
+            method(method, "POST");
+            c.admin();
+            c.noQuery();
+            c.uniqueQuery();
+            boolean api = path.startsWith("/api/");
+            if (api && !object(body(c)).isEmpty())
+                throw new Failure(400, "Provide an empty JSON object");
+            RecoveryLinks.revoke(c.db, c.user.get("user_id").toString(), recoveryRevoke.group(1));
+            return api
+                    ? json(map("result", map("revoked", true)), 200)
+                    : redirect("/admin/accounts/" + recoveryRevoke.group(1));
         }
         Matcher accountRole =
                 Pattern.compile("/api/openservice/users/([0-9a-f]{32})/role").matcher(path);
@@ -817,12 +880,13 @@ public class WebController {
         c.noQuery();
         c.uniqueQuery();
         var account = Service.account(c.db, id);
+        Map<String, Object> recovery = null;
         String error = null;
         int status = 200;
         if (method.equals("POST")) {
             try {
                 String operation = c.parameter("operation", "status");
-                if (!Set.of("status", "role").contains(operation))
+                if (!Set.of("status", "role", "recovery").contains(operation))
                     throw new Failure(400, "Choose an account operation");
                 if (operation.equals("role")) {
                     Service.changeRole(
@@ -830,6 +894,14 @@ public class WebController {
                             c.user.get("user_id").toString(),
                             id,
                             map("role", c.parameter("role", "")));
+                } else if (operation.equals("recovery")) {
+                    recovery =
+                            RecoveryLinks.issue(
+                                    c.db,
+                                    c.user.get("user_id").toString(),
+                                    id,
+                                    map("current_password", c.parameter("current_password", "")));
+                    status = 201;
                 } else {
                     String active = c.parameter("active", "");
                     if (!Set.of("true", "false").contains(active))
@@ -840,7 +912,7 @@ public class WebController {
                             id,
                             map("active", Boolean.parseBoolean(active)));
                 }
-                return redirect("/admin/accounts/" + id);
+                if (!operation.equals("recovery")) return redirect("/admin/accounts/" + id);
             } catch (Failure failure) {
                 error = failure.getMessage();
                 status = failure.status;
@@ -858,7 +930,9 @@ public class WebController {
                                 "error",
                                 error,
                                 "roles",
-                                Service.ROLES));
+                                Service.ROLES,
+                                "recovery",
+                                recovery));
         result.setStatus(HttpStatus.valueOf(status));
         return result;
     }

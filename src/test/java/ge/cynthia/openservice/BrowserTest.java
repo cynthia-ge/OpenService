@@ -48,6 +48,62 @@ class BrowserTest {
     }
 
     @Test
+    void administratorAssistsRecoveryAndOldBrowserMustAuthenticateAgain() throws Exception {
+        String name = "RecoveryBrowser" + id().substring(0, 8),
+                next = "browser-recovery-password",
+                target;
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db, map("name", name, "role", "reader", "password", WorkflowSupport.PASSWORD));
+            target =
+                    db.one("SELECT user_id FROM os_user WHERE name=?", name)
+                            .get("user_id")
+                            .toString();
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var adminContext = browser.newContext();
+                var oldContext = browser.newContext();
+                var resetContext = browser.newContext()) {
+            var admin = adminContext.newPage();
+            var old = oldContext.newPage();
+            var reset = resetContext.newPage();
+            login(admin, "admin");
+            login(old, name);
+            admin.navigate(base() + "/admin/accounts/" + target);
+            admin.getByLabel("Your administrator password").fill(WorkflowSupport.PASSWORD);
+            admin.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Create recovery link"))
+                    .click();
+            String path =
+                    admin.getByRole(
+                                    AriaRole.LINK,
+                                    new Page.GetByRoleOptions().setName("Password recovery link"))
+                            .getAttribute("href");
+            reset.navigate(base() + path);
+            reset.getByLabel("New password").fill(next);
+            reset.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Reset password"))
+                    .click();
+            reset.waitForURL("**/login");
+            old.navigate(base() + "/account");
+            old.waitForURL("**/login");
+            reset.getByLabel("Username", new Page.GetByLabelOptions().setExact(true)).fill(name);
+            reset.getByLabel("Password", new Page.GetByLabelOptions().setExact(true)).fill(next);
+            reset.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Enter your workspace"))
+                    .click();
+            reset.waitForURL(base() + "/");
+            assertTrue(reset.request().get(base() + "/api/openservice/me").text().contains(target));
+            admin.setViewportSize(390, 844);
+            assertTrue(
+                    (Boolean) admin.evaluate("document.documentElement.scrollWidth <= innerWidth"));
+        }
+    }
+
+    @Test
     void administratorInvitesAndRecipientChoosesTheirOwnPassword() throws Exception {
         String name = "InvitedBrowser" + id().substring(0, 8);
         try (var playwright = Playwright.create();

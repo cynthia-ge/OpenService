@@ -2,7 +2,7 @@
 
 A service operations foundation for Cynthia: clear workspaces, shared records, controlled workflows and a practical path from ServiceNow exports.
 
-Development priorities and adoption gates are defined in the [roadmap and build order](docs/roadmap.md). Identity, invitations, account lifecycle and access isolation are the next prerequisites. The current build supports a disposable local walkthrough with synthetic data; shared evaluation and operational pilot gates remain unmet.
+Development priorities and adoption gates are defined in the [roadmap and build order](docs/roadmap.md). Local identity, manual invitation/recovery and account lifecycle slices are implemented; scoped access, verified delivery and operational controls remain adoption prerequisites. The current build supports a disposable local walkthrough with synthetic data; shared evaluation and operational pilot gates remain unmet.
 
 ## Screenshots
 
@@ -61,7 +61,8 @@ For a first review with colleagues, follow the [evaluation walkthrough](docs/eva
 - Incident, problem, change, request, configuration-item, knowledge and group workspaces.
 - Create/edit forms, summary search, pagination, record details and responsive navigation.
 - State transitions and administrator approval/rejection for changes, enforced in the API as well as the UI.
-- Administrator-only account creation and paginated account lists in the browser; administrator, agent and reader roles, stable identities, password hashes, revocable sessions, CSRF protection and authenticated Basic API access. Administrators can deactivate/reactivate accounts with last-active-administrator protection.
+- Administrator-only account creation and paginated account lists in the browser; administrator, agent and reader roles, stable identities, password hashes, revocable sessions, CSRF protection and authenticated Basic API access. Administrators can change roles and deactivate/reactivate accounts with last-active-administrator protection.
+- Recipient-set passwords through manual, one-time invitations; authenticated password changes; administrator-assisted short-lived recovery; bounded browser-session lifetime and administrator-only lifecycle security events. Links require private manual delivery; email verification and granular record access remain open.
 - Activity notes, persistent attachments with binary/multipart upload, metadata/list/download and administrator deletion APIs, audit events and JSON export.
 - A shared schema registry used by validation, API services and generated forms.
 - A bounded Table API subset: CRUD on unversioned/v1/v2 routes, selected encoded-query operators, sorting, field projection, pagination, optional Link suppression and reads without total-count queries.

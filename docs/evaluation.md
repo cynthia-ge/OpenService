@@ -17,7 +17,7 @@ Follow [Run locally](../README.md#run-locally), then open http://localhost:8090 
 3. Create `EvalReader` with **Reader**, the form's default role. Share credentials through an agreed secure channel.
 4. Confirm both names and roles appear in the list. With more than 25 accounts, use the page controls. Passwords are never displayed after submission.
 
-Administrator can also create another administrator. Duplicate names return an inline error without changing the existing account. Select an account name to deactivate or reactivate it. Deactivation blocks browser and Basic authentication, and existing browser sessions lose access on their next request; reactivation requires a fresh login. The last active administrator cannot be deactivated. Use the account’s role form to promote or demote it; existing browser sessions must sign in again. Each user can change their own password from Account security using their current password. Forgotten-password recovery remains unavailable in this slice, so keep the environment disposable.
+Administrator can also create another administrator. Duplicate names return an inline error without changing the existing account. Select an account name to deactivate or reactivate it. Deactivation blocks browser and Basic authentication, and existing browser sessions lose access on their next request; reactivation requires a fresh login. The last active administrator cannot be deactivated. Use the account’s role form to promote or demote it; existing browser sessions must sign in again. Each user can change their own password from Account security using their current password. Administrator-assisted recovery is available through short-lived one-time links; keep this evaluation environment disposable and use synthetic data.
 
 ## Walk through service-desk work
 
@@ -39,8 +39,10 @@ For a broader review, use [Migration studio](migration.md) to preview a small sy
 - What identity provider, team/customer separation and audit controls are required?
 - What availability, recovery, upgrade and performance targets would a pilot need?
 
-SSO, granular ACLs/domain isolation, password reset, comprehensive lifecycle controls and high availability remain incomplete; versioned upgrades now exist but operational restore drills remain unverified. Existing Docker/browser tests demonstrate the documented evaluation workflows; they do not establish production readiness or complete ServiceNow compatibility.
+SSO, granular ACLs/domain isolation, verified delivery, authentication hardening and high availability remain incomplete; versioned upgrades now exist but operational restore drills remain unverified. Existing Docker/browser tests demonstrate the documented evaluation workflows; they do not establish production readiness or complete ServiceNow compatibility.
 
 Use **Security events** as an administrator to review successful account changes. Failed attempts are not part of this journal; it shows the latest 100 recorded lifecycle events and does not replace external security monitoring.
 
 For a recipient-set password, open **Invitations**, choose a new username and role, and create a link. Copy it from that response and share it with the intended colleague through your agreed secure channel. In a separate browser, the recipient opens the link, chooses their password and signs in. Links work once, expire after 24 hours, and can be revoked or replaced; issuer security changes also invalidate outstanding links. This manual flow does not send email or verify an address, and it retains workspace-wide read access.
+
+For a forgotten password, an administrator opens the person’s account, verifies the recipient through the agreed support process, confirms their own password and chooses **Create recovery link**. Share the displayed link privately; it expires after 15 minutes. The recipient chooses a new password and signs in again. Existing browser sessions and the old API password stop working. **Revoke recovery link** cancels an unused link. Disabled accounts must stay disabled; recovery does not reactivate them.

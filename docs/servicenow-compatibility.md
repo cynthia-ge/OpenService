@@ -157,3 +157,7 @@ Implemented local ADOPT-08 slice: server-side authentication age, an exclusive e
 ## OS-034 — Manual invitation onboarding
 
 Implemented local ADOPT-04 slice: administrator UI/API issuance/revocation, hashed expiring bearer tokens, issuer-revision binding, CSRF-protected recipient password setup, atomic single-use acceptance and sanitized journals. Vendor application-specific invitation semantics, email delivery, address verification and scoped membership are not claimed. See [cycle 9](platform-foundations.md).
+
+## OS-035 — Administrator-assisted account recovery
+
+Implemented local ADOPT-05/08/09 slice: administrator reauthentication, one-time hashed 15-minute links, replacement/revocation, issuer/target revision binding, recipient password selection, atomic single-use consumption and browser/credential revocation with sanitized audit. It does not unlock inactive users or reproduce vendor delegated reset roles, identity-verification integrations or delivery services. See [cycle 10](platform-foundations.md).

@@ -11,4 +11,8 @@
 <label for="account-role">Account role</label><select id="account-role" name="role"><option th:each="role:${roles}" th:value="${role.key}" th:selected="${role.key==account.role}" th:text="${role.value[0]}"></option></select>
 <p>Changing a role signs out this person’s browsers on their next request. Basic API access uses the new role immediately. All roles can read all workspace records.</p>
 <button class="button primary">Save account role</button></form></section>
+<section class="panel"><div class="panel-heading"><h2>Assisted password recovery</h2></div><p>Verify the person’s identity through your agreed support process before sharing a link. Links last 15 minutes and work once. Issuing a new link replaces the previous one; it does not change the current password or sign the person out.</p>
+<div th:if="${recovery!=null}" class="notice success"><p>This recovery link is shown once. Share it privately with the verified account holder.</p><a th:href="${recovery.reset_path}" th:text="${recovery.reset_path}" aria-label="Password recovery link"></a></div>
+<form method="post" class="record-form"><input type="hidden" name="csrf" th:value="${csrf}"><input type="hidden" name="operation" value="recovery"><label for="recovery-admin-password">Your administrator password</label><input id="recovery-admin-password" name="current_password" type="password" autocomplete="current-password" required maxlength="1024"><button class="button primary">Create recovery link</button></form>
+<form method="post" th:action="@{/admin/accounts/{id}/recovery/revoke(id=${account.user_id})}" class="record-form"><input type="hidden" name="csrf" th:value="${csrf}"><button class="button">Revoke recovery link</button></form></section>
 </main></html>

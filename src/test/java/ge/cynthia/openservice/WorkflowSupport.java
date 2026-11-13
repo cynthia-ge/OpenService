@@ -34,10 +34,230 @@ abstract class WorkflowSupport {
                             "os_event",
                             "os_record",
                             "os_security_event",
-                            "os_invitation")) db.update("DELETE FROM " + table);
+                            "os_invitation",
+                            "os_recovery")) db.update("DELETE FROM " + table);
             db.update("DELETE FROM os_user WHERE name<>?", "admin");
             db.connection.commit();
         }
+    }
+
+    @Test
+    void assistedRecoveryRequiresReauthenticationAndNeverRestoresRevokedAccess() throws Exception {
+        account("RecoverUser", "reader");
+        account("RecoveryAgent", "agent");
+        account("RecoveryAdmin", "admin");
+        String target =
+                object(parsed(get("/api/openservice/me", auth("RecoverUser"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String api = "/api/openservice/users/" + target + "/recovery",
+                page = "/admin/accounts/" + target;
+        var confirm = map("current_password", PASSWORD);
+        assertEquals(403, json("POST", api, confirm, auth("RecoverUser")).statusCode());
+        assertEquals(403, json("POST", api, confirm, auth("RecoveryAgent")).statusCode());
+        for (Object bad :
+                List.of(
+                        List.of(),
+                        map(),
+                        map("current_password", 1),
+                        map("current_password", "x".repeat(1025)),
+                        map("current_password", "wrong"),
+                        map("current_password", PASSWORD, "extra", 1)))
+            assertEquals(400, json("POST", api, bad, auth("admin")).statusCode());
+        assertEquals(405, get(api, auth("admin")).statusCode());
+        assertEquals(400, json("POST", api + "?x=1", confirm, auth("admin")).statusCode());
+        assertEquals(
+                404,
+                json(
+                                "POST",
+                                "/api/openservice/users/" + "f".repeat(32) + "/recovery",
+                                confirm,
+                                auth("admin"))
+                        .statusCode());
+        login("RecoverUser");
+        var issued = json("POST", api, confirm, auth("admin"));
+        assertEquals(201, issued.statusCode());
+        String previous = object(parsed(issued).get("result")).get("reset_path").toString();
+        String path =
+                object(parsed(json("POST", api, confirm, auth("admin"))).get("result"))
+                        .get("reset_path")
+                        .toString();
+        assertNotEquals(path, previous);
+        assertEquals(400, get(previous, null).statusCode());
+        assertEquals(200, get("/api/openservice/me", null).statusCode());
+        assertEquals(200, get("/api/openservice/me", auth("RecoverUser")).statusCode());
+        String token = path.substring(9);
+        try (var db = store.open()) {
+            var row = db.one("SELECT * FROM os_recovery WHERE user_id=?", target);
+            assertEquals(Passwords.tokenHash(token), row.get("token_hash"));
+            assertFalse(row.toString().contains(token));
+        }
+        var first = client;
+        String next = "recovered-user-password";
+        try (var second =
+                HttpClient.newBuilder()
+                        .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
+                        .build()) {
+            client = second;
+            login("RecoverUser");
+            var resetPage = get(path, null);
+            assertEquals(200, resetPage.statusCode());
+            assertEquals(
+                    "no-referrer", resetPage.headers().firstValue("Referrer-Policy").orElseThrow());
+            String csrf = csrf(resetPage);
+            assertEquals(403, form(path, map("password", next), null).statusCode());
+            for (String bad : List.of("short", "x".repeat(1025), PASSWORD))
+                assertEquals(
+                        400, form(path, map("csrf", csrf, "password", bad), null).statusCode());
+            assertEquals(400, get(path + "?redirect=bad", null).statusCode());
+            assertEquals(405, json("PUT", path, map(), null).statusCode());
+            new Store(environment);
+            assertEquals(302, form(path, map("csrf", csrf, "password", next), null).statusCode());
+            assertEquals(401, get("/api/openservice/me", null).statusCode());
+            client = first;
+            assertEquals(401, get("/api/openservice/me", null).statusCode());
+        } finally {
+            client = first;
+        }
+        assertEquals(400, get(path, null).statusCode());
+        assertEquals(401, get("/api/openservice/me", auth("RecoverUser")).statusCode());
+        String newAuth =
+                "Basic "
+                        + Base64.getEncoder()
+                                .encodeToString(
+                                        ("RecoverUser:" + next).getBytes(StandardCharsets.UTF_8));
+        var identity = object(parsed(get("/api/openservice/me", newAuth)).get("result"));
+        assertEquals(target, identity.get("user_id"));
+        assertEquals("reader", identity.get("role"));
+        var events =
+                objects(
+                        parsed(get("/api/openservice/security-events", auth("admin")))
+                                .get("result"));
+        assertEquals("account.password_recovered", events.get(0).get("action"));
+        assertFalse(JSON.writeValueAsString(events).contains(token));
+        assertFalse(JSON.writeValueAsString(events).contains(next));
+        String expired =
+                object(parsed(json("POST", api, confirm, auth("admin"))).get("result"))
+                        .get("reset_path")
+                        .toString();
+        try (var db = store.open()) {
+            db.update("UPDATE os_recovery SET expires_at=0 WHERE user_id=?", target);
+            db.connection.commit();
+        }
+        assertEquals(400, get(expired, null).statusCode());
+        String revoked =
+                object(parsed(json("POST", api, confirm, auth("admin"))).get("result"))
+                        .get("reset_path")
+                        .toString();
+        assertEquals(403, json("POST", api + "/revoke", map(), auth("RecoveryAgent")).statusCode());
+        assertEquals(
+                400, json("POST", api + "/revoke", map("extra", 1), auth("admin")).statusCode());
+        assertEquals(405, get(api + "/revoke", auth("admin")).statusCode());
+        assertEquals(200, json("POST", api + "/revoke", map(), auth("admin")).statusCode());
+        assertEquals(200, json("POST", api + "/revoke", map(), auth("admin")).statusCode());
+        assertEquals(400, get(revoked, null).statusCode());
+        assertEquals(
+                404,
+                json(
+                                "POST",
+                                "/api/openservice/users/" + "f".repeat(32) + "/recovery/revoke",
+                                map(),
+                                auth("admin"))
+                        .statusCode());
+        String disabled =
+                object(parsed(json("POST", api, confirm, auth("admin"))).get("result"))
+                        .get("reset_path")
+                        .toString();
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + target + "/status",
+                                map("active", false),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(409, json("POST", api, confirm, auth("admin")).statusCode());
+        assertEquals(400, get(disabled, null).statusCode());
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + target + "/status",
+                                map("active", true),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(400, get(disabled, null).statusCode());
+        String issuer =
+                object(parsed(get("/api/openservice/me", auth("RecoveryAdmin"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String lostAuthority =
+                object(parsed(json("POST", api, confirm, auth("RecoveryAdmin"))).get("result"))
+                        .get("reset_path")
+                        .toString();
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + issuer + "/role",
+                                map("role", "agent"),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(400, get(lostAuthority, null).statusCode());
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + issuer + "/role",
+                                map("role", "admin"),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(400, get(lostAuthority, null).statusCode());
+        String changed =
+                object(parsed(json("POST", api, confirm, auth("admin"))).get("result"))
+                        .get("reset_path")
+                        .toString();
+        assertEquals(
+                200,
+                json(
+                                "POST",
+                                "/api/openservice/me/password",
+                                map(
+                                        "current_password",
+                                        next,
+                                        "new_password",
+                                        "another-recovery-password"),
+                                newAuth)
+                        .statusCode());
+        assertEquals(400, get(changed, null).statusCode());
+        assertEquals(400, get("/recover/" + "x".repeat(32), null).statusCode());
+        String csrf = login("admin");
+        assertEquals(
+                403,
+                form(page, map("operation", "recovery", "current_password", PASSWORD), null)
+                        .statusCode());
+        var error =
+                form(
+                        page,
+                        map(
+                                "operation",
+                                "recovery",
+                                "current_password",
+                                "do-not-echo-secret",
+                                "csrf",
+                                csrf),
+                        null);
+        assertEquals(400, error.statusCode());
+        assertFalse(html(error).contains("do-not-echo-secret"));
+        var ui =
+                form(
+                        page,
+                        map("operation", "recovery", "current_password", PASSWORD, "csrf", csrf),
+                        null);
+        assertEquals(201, ui.statusCode());
+        assertTrue(html(ui).contains("Password recovery link"));
+        assertEquals(302, form(page + "/recovery/revoke", map("csrf", csrf), null).statusCode());
+        assertFalse(html(get(page, null)).contains("Password recovery link"));
     }
 
     @Test
