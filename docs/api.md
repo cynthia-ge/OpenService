@@ -28,7 +28,7 @@ This is local account onboarding, not a ServiceNow `sys_user` API. All roles can
 
 ## Table requests
 
-List parameters: `sysparm_query`, `sysparm_fields`, `sysparm_limit` (1–10000; default 10000), `sysparm_offset` (default 0). A single-record GET supports only `sysparm_fields`. Unsupported parameters fail rather than silently changing results.
+List parameters: `sysparm_query`, `sysparm_fields`, `sysparm_limit` (1–10000; default 10000), `sysparm_offset` (default 0), `sysparm_suppress_pagination_header` (true/false; default false). A single-record GET supports only `sysparm_fields`. Unsupported parameters fail rather than silently changing results.
 
 The query subset supports `field=value`, `field!=value`, string `LIKE`, `STARTSWITH`, `^` conjunction, `ORDERBYfield` and `ORDERBYDESCfield`. This is not the full encoded-query grammar. No OR/NQ, dot-walking, dynamic filters, JavaScript, ACL-dependent counts or reference display modes. Sorting and filtering execute in the database. SQLite and PostgreSQL may differ in text collation.
 
@@ -80,3 +80,7 @@ Table and count Aggregate APIs accept `fieldISEMPTY` and `fieldISNOTEMPTY`, with
 ## Literal negative substring queries
 
 `fieldNOT LIKEvalue` (with a space in `NOT LIKE`) selects non-null stored strings that do not contain the literal value. It shares the LIKE-family escaping/comparison policy above and runs before Table pagination and Aggregate counts. Empty stored strings match when the operand is nonempty; an empty operand selects no records. SQL null/missing values are excluded. Unknown fields and the unsupported spelling `NOTLIKE` return 400. AND composition and ordering are supported.
+
+## Pagination-header suppression
+
+For Table collection reads, `sysparm_suppress_pagination_header=true` omits the Link header. It preserves records, filtering, projection, pagination and X-Total-Count. Omitted or explicit false retains the existing links; generated links preserve the false flag. Only literal lowercase true/false is accepted; invalid/repeated values return 400. The flag applies to unversioned/v1/v2 collection routes, including empty v2/unversioned results, and is not supported on individual-record reads.

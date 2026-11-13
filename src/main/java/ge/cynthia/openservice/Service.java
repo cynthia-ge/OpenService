@@ -332,14 +332,25 @@ public final class Service {
         return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
-    public record Page(List<Map<String, Object>> rows, long total, int limit, int offset) {}
+    public record Page(
+            List<Map<String, Object>> rows,
+            long total,
+            int limit,
+            int offset,
+            boolean suppressPagination) {}
 
     public static Page page(Store.Db db, String table, Map<String, String> args, String search)
             throws SQLException {
-        if (!Set.of("sysparm_query", "sysparm_limit", "sysparm_offset", "sysparm_fields")
+        if (!Set.of(
+                        "sysparm_query",
+                        "sysparm_limit",
+                        "sysparm_offset",
+                        "sysparm_fields",
+                        "sysparm_suppress_pagination_header")
                 .containsAll(args.keySet())) throw new Failure(400, "Unsupported query parameter");
         int limit = number(args.getOrDefault("sysparm_limit", "10000"), 1, 10000),
                 offset = number(args.getOrDefault("sysparm_offset", "0"), 0, Integer.MAX_VALUE);
+        boolean suppressPagination = flag(args, "sysparm_suppress_pagination_header");
         var query = selection(db, table, args.getOrDefault("sysparm_query", ""), search);
         long total =
                 db.count(
@@ -361,7 +372,14 @@ public final class Service {
                         .map(Service::serialize)
                         .map(row -> project(row, args.getOrDefault("sysparm_fields", "")))
                         .toList();
-        return new Page(rows, total, limit, offset);
+        return new Page(rows, total, limit, offset, suppressPagination);
+    }
+
+    public static boolean flag(Map<String, String> args, String name) {
+        String value = args.getOrDefault(name, "false");
+        if (!Set.of("true", "false").contains(value))
+            throw new Failure(400, name + " must be true or false");
+        return value.equals("true");
     }
 
     public static int number(String value, int minimum, int maximum) {

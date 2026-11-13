@@ -263,34 +263,36 @@ public class WebController {
             if (path.startsWith("/api/now/v1/") && page.rows().isEmpty())
                 throw new Failure(404, "No records found");
             c.response.setHeader("X-Total-Count", String.valueOf(page.total()));
-            var links = new ArrayList<String>();
-            var positions =
-                    map(
-                            "first",
-                            0,
-                            "last",
-                            Math.max(0, (page.total() - 1) / page.limit() * page.limit()),
-                            "prev",
-                            (long) page.offset() - page.limit(),
-                            "next",
-                            (long) page.offset() + page.limit());
-            for (var entry : positions.entrySet()) {
-                long index = ((Number) entry.getValue()).longValue();
-                if (entry.getKey().equals("prev") && index < 0
-                        || entry.getKey().equals("next") && index >= page.total()) continue;
-                var args = new LinkedHashMap<>(c.arguments());
-                args.put("sysparm_limit", String.valueOf(page.limit()));
-                args.put("sysparm_offset", String.valueOf(index));
-                links.add(
-                        "<"
-                                + c.http.getRequestURL()
-                                + "?"
-                                + query(args)
-                                + ">; rel=\""
-                                + entry.getKey()
-                                + "\"");
+            if (!page.suppressPagination()) {
+                var links = new ArrayList<String>();
+                var positions =
+                        map(
+                                "first",
+                                0,
+                                "last",
+                                Math.max(0, (page.total() - 1) / page.limit() * page.limit()),
+                                "prev",
+                                (long) page.offset() - page.limit(),
+                                "next",
+                                (long) page.offset() + page.limit());
+                for (var entry : positions.entrySet()) {
+                    long index = ((Number) entry.getValue()).longValue();
+                    if (entry.getKey().equals("prev") && index < 0
+                            || entry.getKey().equals("next") && index >= page.total()) continue;
+                    var args = new LinkedHashMap<>(c.arguments());
+                    args.put("sysparm_limit", String.valueOf(page.limit()));
+                    args.put("sysparm_offset", String.valueOf(index));
+                    links.add(
+                            "<"
+                                    + c.http.getRequestURL()
+                                    + "?"
+                                    + query(args)
+                                    + ">; rel=\""
+                                    + entry.getKey()
+                                    + "\"");
+                }
+                c.response.setHeader("Link", String.join(", ", links));
             }
-            c.response.setHeader("Link", String.join(", ", links));
             return json(map("result", page.rows()), 200);
         }
         Matcher resource =

@@ -115,3 +115,15 @@ QA round 1: reviewed parsing versus NOT IN and LIKE, bound SQL/wildcard escaping
 Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 270 tests pass, no skipped tests. Exact feature gate: `Service.java`: 352/352 lines, 214/214 branches, 26/26 methods. Whole Java application: 1128/1128 lines, 618/618 branch outcomes, 89/89 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Service.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
 
 Existing database case-comparison differences and stored-value-only scope remain documented. No display-value resolution or complete vendor encoded-query parity is claimed. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.
+
+## Cycle 8: OS-023 — Optional pagination-header suppression
+
+Fixed QA base: `1e8005af5c0942a1c7186fd4afcc49f66fc7a2a5`; branch `main`, clean starting tree. Blueprint A4(a). Australia Table API documents sysparm_suppress_pagination_header, default false, with true suppressing Link. The new HTTP regression failed with unsupported-parameter 400 before implementation. OpenService accepts strict lowercase boolean values.
+
+Both database suites exercise unversioned/v1/v2 collection routes, true/false/omitted flags, unchanged rows/projection/count, all pagination relations, preservation of the explicit false flag in links, empty results and invalid/repeated/single-record parameter rejection.
+
+QA round 1: reviewed validation before querying, Page propagation into the HTTP layer, Link-only suppression, unchanged total-count/data behavior and UI defaults, tests and docs. No new/reopened findings or repairs; required checks pass. Unresolved: none.
+
+Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 272 tests pass, no skipped tests. Exact feature gate: `Service.java`: 357/357 lines, 216/216 branches, 27/27 methods; `WebController.java`: 613/613 lines, 310/310 branches, 37/37 methods. Whole Java application: 1134/1134 lines, 622/622 branch outcomes, 90/90 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Service.java`, `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
+
+This flag suppresses links only; avoiding the count query is a separate candidate. Existing local pagination/error semantics and bounded Table subset remain in force. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.

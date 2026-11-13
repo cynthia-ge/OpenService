@@ -1309,4 +1309,58 @@ abstract class WorkflowSupport {
                         get(endpoint + "sysparm_query=" + encoded(query), auth("admin"))
                                 .statusCode());
     }
+
+    @Test
+    void paginationHeaderSuppressionPreservesRecordsAndCount() throws Exception {
+        var ids =
+                List.of(
+                        add("incident").get("sys_id"),
+                        add("incident").get("sys_id"),
+                        add("incident").get("sys_id"));
+        for (String prefix :
+                List.of("/api/now/table/", "/api/now/v1/table/", "/api/now/v2/table/")) {
+            String path =
+                    prefix + "incident?sysparm_limit=1&sysparm_offset=1&sysparm_fields=sys_id";
+            var suppressed = get(path + "&sysparm_suppress_pagination_header=true", auth("admin"));
+            assertEquals(200, suppressed.statusCode(), html(suppressed));
+            assertTrue(suppressed.headers().firstValue("Link").isEmpty());
+            assertEquals("3", suppressed.headers().firstValue("X-Total-Count").orElseThrow());
+            assertEquals(List.of(map("sys_id", ids.get(1))), parsed(suppressed).get("result"));
+            var explicit = get(path + "&sysparm_suppress_pagination_header=false", auth("admin"));
+            var implicit = get(path, auth("admin"));
+            assertEquals(parsed(implicit), parsed(explicit));
+            assertEquals(parsed(implicit), parsed(suppressed));
+            for (String relation : List.of("first", "last", "prev", "next"))
+                assertTrue(
+                        explicit.headers()
+                                .firstValue("Link")
+                                .orElseThrow()
+                                .contains("rel=\"" + relation + "\""));
+            assertTrue(
+                    explicit.headers()
+                            .firstValue("Link")
+                            .orElseThrow()
+                            .contains("sysparm_suppress_pagination_header=false"));
+        }
+        String path = "/api/now/table/incident?sysparm_suppress_pagination_header=";
+        for (String invalid : List.of("", "True", "1", "no", "%20true"))
+            assertEquals(400, get(path + invalid, auth("admin")).statusCode());
+        assertEquals(
+                400,
+                get(path + "true&sysparm_suppress_pagination_header=false", auth("admin"))
+                        .statusCode());
+        var empty = get(path + "true&sysparm_query=sys_id%3Dmissing", auth("admin"));
+        assertEquals(200, empty.statusCode());
+        assertEquals(List.of(), parsed(empty).get("result"));
+        assertTrue(empty.headers().firstValue("Link").isEmpty());
+        assertEquals("0", empty.headers().firstValue("X-Total-Count").orElseThrow());
+        assertEquals(
+                400,
+                get(
+                                "/api/now/table/incident/"
+                                        + ids.get(0)
+                                        + "?sysparm_suppress_pagination_header=true",
+                                auth("admin"))
+                        .statusCode());
+    }
 }
