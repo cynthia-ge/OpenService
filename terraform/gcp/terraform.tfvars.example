@@ -1,0 +1,4 @@
+project_id = "REPLACE_WITH_PROJECT_ID"
+region     = "europe-west1"
+name       = "openservice"
+image      = "europe-west1-docker.pkg.dev/REPLACE/apps/openservice:0.1.0"

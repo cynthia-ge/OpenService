@@ -1,0 +1,4 @@
+name    = "openservice"
+region  = "eu-west-1"
+profile = "cynthia"
+image   = "public.ecr.aws/REPLACE/openservice:0.1.0"

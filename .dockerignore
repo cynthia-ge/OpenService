@@ -1,0 +1,9 @@
+.git
+.venv
+.env
+artifacts
+**/.terraform
+**/*.tfstate*
+**/*.tfvars
+**/__pycache__
+.coverage*

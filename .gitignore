@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.coverage*
+coverage.json
+htmlcov/
+*.egg-info/
+.env
+*.db
+artifacts/
+.terraform/
+*.tfstate*
+*.tfplan
+*.tfvars
+!*.tfvars.example

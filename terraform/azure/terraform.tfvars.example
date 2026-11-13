@@ -1,0 +1,4 @@
+subscription_id = "REPLACE_WITH_SUBSCRIPTION_ID"
+location        = "westeurope"
+name            = "openservice"
+image           = "docker.io/REPLACE/openservice:0.1.0"
