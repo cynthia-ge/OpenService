@@ -137,3 +137,7 @@ Implemented local ADOPT-05/08 slice: persistent authentication revisions, next-r
 ## OS-029 — Administrator account-state lifecycle
 
 Implemented local ADOPT-05 slice: active/inactive migration, administrator UI/API, denied inactive authentication on every supported path, revocation on effective state changes, idempotency, persistent reactivation and concurrent last-active-administrator protection. Identities, passwords and attribution are preserved. Native sys_user, vendor reference-picker rules and delegated roles are not claimed. See [cycle 4](platform-foundations.md).
+
+## OS-030 — Guarded local role administration
+
+Implemented local ADOPT-05 slice: administrator UI/API role changes, transactional final-administrator protection, immediate subsequent-request Basic permissions and browser session revocation. Account state/identity is preserved. Group inheritance, custom roles and native ServiceNow role APIs remain outside this contract. See [cycle 5](platform-foundations.md).

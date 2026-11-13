@@ -112,3 +112,5 @@ ADOPT-03 now includes stable user identities, migration/backfill, session bindin
 ADOPT-05/08 now include persistent all-browser session revocation and an account-security page. Account deactivation, role changes, password management, rate limits and absolute session lifetime remain open. See platform cycle 3.
 
 ADOPT-05 now includes administrator-controlled deactivation/reactivation, cross-entry-point account-state enforcement and concurrent last-active-administrator protection. Role changes, password recovery and complete offboarding/ownership transfer remain open. ADOPT-09 security events and ADOPT-06 resource isolation are still prerequisites. See platform cycle 4.
+
+ADOPT-05 now also includes guarded local role changes with session revocation and concurrent final-administrator protection. Password management, group memberships, scoped permissions and lifecycle audit remain open. See platform cycle 5.

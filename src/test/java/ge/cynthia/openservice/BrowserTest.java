@@ -79,6 +79,19 @@ class BrowserTest {
                             new Page.GetByRoleOptions().setName("Save account status"))
                     .click();
             login(user, name);
+            admin.getByLabel("Account role").selectOption("reader");
+            admin.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Save account role"))
+                    .click();
+            user.navigate(base() + "/account");
+            user.waitForURL("**/login");
+            login(user, name);
+            assertTrue(
+                    user.request()
+                            .get(base() + "/api/openservice/me")
+                            .text()
+                            .contains("\"role\":\"reader\""));
             admin.setViewportSize(390, 844);
             assertTrue(
                     (Boolean) admin.evaluate("document.documentElement.scrollWidth <= innerWidth"));

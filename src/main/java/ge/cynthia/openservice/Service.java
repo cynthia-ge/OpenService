@@ -422,11 +422,7 @@ public final class Service {
         if (!value.keySet().equals(Set.of("active"))
                 || !(value.get("active") instanceof Boolean active))
             throw new Failure(400, "Provide one boolean active field");
-        if (db.postgres) db.all("SELECT pg_advisory_xact_lock(18439,2)");
-        if (db.one(
-                        "SELECT user_id FROM os_user WHERE user_id=? AND active=1 AND role='admin'",
-                        actorId)
-                == null) throw new Failure(403, "Active administrator required");
+        requireAccountAdministrator(db, actorId);
         var user = account(db, userId);
         if (user.get("active").equals(active)) return user;
         if (user.get("role").equals("admin")
@@ -434,6 +430,33 @@ public final class Service {
                 && db.count("SELECT COUNT(*) FROM os_user WHERE role='admin' AND active=1") <= 1)
             throw new Failure(409, "Keep at least one active administrator");
         db.update("UPDATE os_user SET active=? WHERE user_id=?", active ? 1 : 0, userId);
+        revokeSessions(db, userId);
+        return account(db, userId);
+    }
+
+    private static void requireAccountAdministrator(Store.Db db, String actorId)
+            throws SQLException {
+        if (db.postgres) db.all("SELECT pg_advisory_xact_lock(18439,2)");
+        if (db.one(
+                        "SELECT user_id FROM os_user WHERE user_id=? AND active=1 AND role='admin'",
+                        actorId)
+                == null) throw new Failure(403, "Active administrator required");
+    }
+
+    public static Map<String, Object> changeRole(
+            Store.Db db, String actorId, String userId, Object body) throws SQLException {
+        var value = object(body);
+        if (!value.keySet().equals(Set.of("role")) || !ROLES.containsKey(value.get("role")))
+            throw new Failure(400, "Provide one supported role field");
+        requireAccountAdministrator(db, actorId);
+        var user = account(db, userId);
+        String role = value.get("role").toString();
+        if (user.get("role").equals(role)) return user;
+        if (user.get("role").equals("admin")
+                && user.get("active").equals(true)
+                && db.count("SELECT COUNT(*) FROM os_user WHERE role='admin' AND active=1") <= 1)
+            throw new Failure(409, "Keep at least one active administrator");
+        db.update("UPDATE os_user SET role=? WHERE user_id=?", role, userId);
         revokeSessions(db, userId);
         return account(db, userId);
     }

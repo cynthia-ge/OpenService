@@ -36,6 +36,99 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void roleChangesEnforcePermissionsRevokeSessionsAndPreserveAnAdministrator() throws Exception {
+        account("RoleAgent", "agent");
+        account("RoleReader", "reader");
+        String id =
+                object(parsed(get("/api/openservice/me", auth("RoleAgent"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String api = "/api/openservice/users/" + id + "/role", page = "/admin/accounts/" + id;
+        login("RoleAgent");
+        assertEquals(403, json("PATCH", api, map("role", "admin"), auth("RoleAgent")).statusCode());
+        assertEquals(
+                403, json("PATCH", api, map("role", "admin"), auth("RoleReader")).statusCode());
+        assertEquals(200, json("PATCH", api, map("role", "reader"), auth("admin")).statusCode());
+        assertEquals(401, get("/api/openservice/me", null).statusCode());
+        assertEquals(
+                403,
+                json(
+                                "POST",
+                                "/api/now/table/incident",
+                                map("short_description", "blocked"),
+                                auth("RoleAgent"))
+                        .statusCode());
+        new Store(environment);
+        assertEquals(
+                "reader",
+                object(parsed(get("/api/openservice/me", auth("RoleAgent"))).get("result"))
+                        .get("role"));
+        login("RoleAgent");
+        assertEquals(200, json("PATCH", api, map("role", "reader"), auth("admin")).statusCode());
+        assertEquals(200, get("/api/openservice/me", null).statusCode());
+        assertEquals(200, json("PATCH", api, map("role", "admin"), auth("admin")).statusCode());
+        assertEquals(401, get("/api/openservice/me", null).statusCode());
+        assertEquals(200, get("/admin/accounts", auth("RoleAgent")).statusCode());
+        assertEquals(200, json("PATCH", api, map("role", "agent"), auth("admin")).statusCode());
+        assertEquals(403, get("/admin/accounts", auth("RoleAgent")).statusCode());
+        for (Object bad :
+                List.of(
+                        map(),
+                        map("role", "owner"),
+                        map("role", 4),
+                        map("role", "reader", "active", true),
+                        List.of()))
+            assertEquals(400, json("PATCH", api, bad, auth("admin")).statusCode());
+        assertEquals(
+                400,
+                json("PATCH", api + "?x=1", map("role", "reader"), auth("admin")).statusCode());
+        assertEquals(405, get(api, auth("admin")).statusCode());
+        assertEquals(
+                404,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + "f".repeat(32) + "/role",
+                                map("role", "reader"),
+                                auth("admin"))
+                        .statusCode());
+        String admin =
+                object(parsed(get("/api/openservice/me", auth("admin"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        assertEquals(
+                409,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + admin + "/role",
+                                map("role", "agent"),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(200, json("PATCH", api, map("role", "admin"), auth("admin")).statusCode());
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + id + "/status",
+                                map("active", false),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(200, json("PATCH", api, map("role", "reader"), auth("admin")).statusCode());
+        assertEquals(401, get("/api/openservice/me", auth("RoleAgent")).statusCode());
+        String token = login("admin");
+        assertEquals(403, form(page, map("operation", "role", "role", "admin"), null).statusCode());
+        assertEquals(400, form(page, map("operation", "other", "csrf", token), null).statusCode());
+        assertEquals(
+                400,
+                form(page, map("operation", "role", "role", "bad", "csrf", token), null)
+                        .statusCode());
+        assertEquals(
+                302,
+                form(page, map("operation", "role", "role", "agent", "csrf", token), null)
+                        .statusCode());
+        assertTrue(html(get(page, null)).contains("Save account role"));
+    }
+
+    @Test
     void administratorsDeactivateAndReactivateWithoutRevivingSessions() throws Exception {
         account("OffboardAgent", "agent");
         account("OffboardReader", "reader");

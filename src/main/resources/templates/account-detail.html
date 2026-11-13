@@ -1,10 +1,14 @@
 <!doctype html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{base :: layout(~{::main})}"><main>
-<section class="page-heading"><div><span class="eyebrow">ACCOUNT ADMINISTRATION</span><h1 th:text="${account.name}">Account</h1><p>Control whether this person can sign in.</p></div><a href="/admin/accounts" class="button">All accounts</a></section>
+<section class="page-heading"><div><span class="eyebrow">ACCOUNT ADMINISTRATION</span><h1 th:text="${account.name}">Account</h1><p>Manage this person’s account access.</p></div><a href="/admin/accounts" class="button">All accounts</a></section>
 <section class="panel"><div class="panel-heading"><h2>Account access</h2></div>
 <div th:if="${error!=null}" class="notice" role="alert" th:text="${error}"></div>
 <p>Making an account inactive blocks sign-in and API access and signs out its browsers on their next request. Records and history remain available. Reactivation requires a fresh sign-in.</p>
 <form method="post" class="record-form"><input type="hidden" name="csrf" th:value="${csrf}">
 <label for="account-active">Account status</label><select id="account-active" name="active"><option value="true" th:selected="${account.active}">Active</option><option value="false" th:selected="${!account.active}">Inactive</option></select>
-<button class="button primary">Save account status</button></form></section>
+<button class="button primary">Save account status</button></form>
+<form method="post" class="record-form"><input type="hidden" name="csrf" th:value="${csrf}"><input type="hidden" name="operation" value="role">
+<label for="account-role">Account role</label><select id="account-role" name="role"><option th:each="role:${roles}" th:value="${role.key}" th:selected="${role.key==account.role}" th:text="${role.value[0]}"></option></select>
+<p>Changing a role signs out this person’s browsers on their next request. Basic API access uses the new role immediately. All roles can read all workspace records.</p>
+<button class="button primary">Save account role</button></form></section>
 </main></html>

@@ -387,6 +387,22 @@ public class WebController {
                                     c.role())),
                     200);
         }
+        Matcher accountRole =
+                Pattern.compile("/api/openservice/users/([0-9a-f]{32})/role").matcher(path);
+        if (accountRole.matches()) {
+            method(method, "PATCH");
+            c.admin();
+            c.noQuery();
+            return json(
+                    map(
+                            "result",
+                            Service.changeRole(
+                                    c.db,
+                                    c.user.get("user_id").toString(),
+                                    accountRole.group(1),
+                                    body(c))),
+                    200);
+        }
         Matcher accountStatus =
                 Pattern.compile("/api/openservice/users/([0-9a-f]{32})/status").matcher(path);
         if (accountStatus.matches()) {
@@ -641,14 +657,25 @@ public class WebController {
         int status = 200;
         if (method.equals("POST")) {
             try {
-                String active = c.parameter("active", "");
-                if (!Set.of("true", "false").contains(active))
-                    throw new Failure(400, "Choose active or inactive");
-                Service.changeActive(
-                        c.db,
-                        c.user.get("user_id").toString(),
-                        id,
-                        map("active", Boolean.parseBoolean(active)));
+                String operation = c.parameter("operation", "status");
+                if (!Set.of("status", "role").contains(operation))
+                    throw new Failure(400, "Choose an account operation");
+                if (operation.equals("role")) {
+                    Service.changeRole(
+                            c.db,
+                            c.user.get("user_id").toString(),
+                            id,
+                            map("role", c.parameter("role", "")));
+                } else {
+                    String active = c.parameter("active", "");
+                    if (!Set.of("true", "false").contains(active))
+                        throw new Failure(400, "Choose active or inactive");
+                    Service.changeActive(
+                            c.db,
+                            c.user.get("user_id").toString(),
+                            id,
+                            map("active", Boolean.parseBoolean(active)));
+                }
                 return redirect("/admin/accounts/" + id);
             } catch (Failure failure) {
                 error = failure.getMessage();
@@ -659,7 +686,15 @@ public class WebController {
                 view(
                         c,
                         "account-detail",
-                        map("table", "accounts", "account", account, "error", error));
+                        map(
+                                "table",
+                                "accounts",
+                                "account",
+                                account,
+                                "error",
+                                error,
+                                "roles",
+                                Service.ROLES));
         result.setStatus(HttpStatus.valueOf(status));
         return result;
     }
@@ -709,7 +744,7 @@ public class WebController {
                                 "accounts",
                                 c.db.all(
                                         "SELECT user_id,name,role,active FROM os_user ORDER BY name"
-                                            + " LIMIT 25 OFFSET ?",
+                                                + " LIMIT 25 OFFSET ?",
                                         (page - 1) * 25),
                                 "total",
                                 total,

@@ -17,7 +17,7 @@ Follow [Run locally](../README.md#run-locally), then open http://localhost:8090 
 3. Create `EvalReader` with **Reader**, the form's default role. Share credentials through an agreed secure channel.
 4. Confirm both names and roles appear in the list. With more than 25 accounts, use the page controls. Passwords are never displayed after submission.
 
-Administrator can also create another administrator. Duplicate names return an inline error without changing the existing account. Select an account name to deactivate or reactivate it. Deactivation blocks browser and Basic authentication, and existing browser sessions lose access on their next request; reactivation requires a fresh login. The last active administrator cannot be deactivated. Password reset and role editing remain unavailable in this slice, so keep the environment disposable.
+Administrator can also create another administrator. Duplicate names return an inline error without changing the existing account. Select an account name to deactivate or reactivate it. Deactivation blocks browser and Basic authentication, and existing browser sessions lose access on their next request; reactivation requires a fresh login. The last active administrator cannot be deactivated. Use the account’s role form to promote or demote it; existing browser sessions must sign in again. Password reset remains unavailable in this slice, so keep the environment disposable.
 
 ## Walk through service-desk work
 
