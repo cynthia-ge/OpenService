@@ -423,10 +423,11 @@ public final class Service {
             throw new Failure(400, "Choose an admin, agent or reader role");
         try {
             db.update(
-                    "INSERT INTO os_user(name,password,role) VALUES(?,?,?)",
+                    "INSERT INTO os_user(name,password,role,user_id) VALUES(?,?,?,?)",
                     name,
                     Passwords.hash(password),
-                    role);
+                    role,
+                    id());
         } catch (SQLException error) {
             if (!"23505".equals(error.getSQLState()) && error.getErrorCode() != 19) throw error;
             db.connection.rollback();

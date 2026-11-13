@@ -125,3 +125,7 @@ Implemented bounded slice, blueprint A4(a). Australia Attachment API list docume
 ## OS-026 — Serialized versioned schema upgrades
 
 Implemented original OpenService persistence slice, blueprint A1 and platform operations, ADOPT-02. Startup serializes schema/bootstrap changes and journals ordered transactional upgrades. Fresh, legacy and previously upgraded databases retain records and credentials; concurrent starts do not race; failed upgrades roll back; unknown or inconsistent histories reject startup. PostgreSQL metadata is scoped to the current schema. This is a local operational contract, not a ServiceNow database/runtime compatibility claim. See [contract, sources and QA evidence](platform-foundations.md).
+
+## OS-027 — Persistent user identities
+
+Implemented local identity slice, ADOPT-03 / blueprint A1/A4(e): migration backfills stable unique IDs, new/bootstrap accounts receive IDs, sessions bind to identities, and the authenticated current-account API exposes only ID/name/role. Credentials, existing create-account responses and historic actor names are preserved. No native sys_user, membership, recovery or record-isolation parity is claimed. See [cycle 2 evidence and sources](platform-foundations.md).

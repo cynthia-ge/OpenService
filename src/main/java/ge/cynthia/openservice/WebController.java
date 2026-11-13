@@ -110,9 +110,11 @@ public class WebController {
             String path = request.getRequestURI(), method = request.getMethod();
             boolean publicPath = Set.of("/healthz", "/login", "/static/app.css").contains(path);
             var user =
-                    db.one(
-                            "SELECT * FROM os_user WHERE name=?",
-                            Objects.toString(session.getAttribute("user"), ""));
+                    session.getAttribute("user") == null
+                            ? null
+                            : db.one(
+                                    "SELECT * FROM os_user WHERE user_id=?",
+                                    session.getAttribute("user"));
             String authorization = request.getHeader("Authorization");
             if (!publicPath && authorization != null && !authorization.isEmpty())
                 user = authenticate(db, authorization);
@@ -238,7 +240,7 @@ public class WebController {
                     throw new Failure(401, "Incorrect username or password");
                 c.http.changeSessionId();
                 Collections.list(c.session.getAttributeNames()).forEach(c.session::removeAttribute);
-                c.session.setAttribute("user", user.get("name"));
+                c.session.setAttribute("user", user.get("user_id"));
                 c.session.setAttribute("csrf", csrf());
                 return redirect("/");
             }
@@ -340,6 +342,21 @@ public class WebController {
             for (var table : c.db.all("SELECT * FROM os_schema ORDER BY name"))
                 result.put((String) table.get("name"), table.get("definition"));
             return json(map("result", result), 200);
+        }
+        if (path.equals("/api/openservice/me")) {
+            method(method, "GET");
+            c.noQuery();
+            return json(
+                    map(
+                            "result",
+                            map(
+                                    "user_id",
+                                    c.user.get("user_id"),
+                                    "name",
+                                    c.name(),
+                                    "role",
+                                    c.role())),
+                    200);
         }
         if (path.equals("/api/openservice/users")) {
             method(method, "POST");

@@ -36,6 +36,54 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void stableCurrentIdentityIsPrivatePersistentAndSessionBound() throws Exception {
+        assertEquals(401, get("/api/openservice/me", null).statusCode());
+        try (var db = store.open()) {
+            db.update(
+                    "INSERT INTO os_user(name,password,role)"
+                        + " VALUES('LegacyWriter','unusable','reader')");
+            db.connection.commit();
+        }
+        assertEquals(
+                401,
+                get("/api/openservice/me", null).statusCode(),
+                "A missing session must not match an unassigned identity");
+        try (var db = store.open()) {
+            db.update("DELETE FROM os_user WHERE name='LegacyWriter'");
+            db.connection.commit();
+        }
+        account("IdentityAgent", "agent");
+        account("IdentityReader", "reader");
+        var ids = new HashSet<String>();
+        for (String name : List.of("admin", "IdentityAgent", "IdentityReader")) {
+            var response = get("/api/openservice/me", auth(name));
+            assertEquals(200, response.statusCode());
+            var user = object(parsed(response).get("result"));
+            assertEquals(Set.of("user_id", "name", "role"), user.keySet());
+            assertEquals(name, user.get("name"));
+            assertTrue(user.get("user_id").toString().matches("[0-9a-f]{32}"));
+            assertTrue(ids.add(user.get("user_id").toString()));
+            login(name);
+            assertEquals(user, object(parsed(get("/api/openservice/me", null)).get("result")));
+            new Store(environment);
+            assertEquals(
+                    user, object(parsed(get("/api/openservice/me", auth(name))).get("result")));
+            assertEquals(400, get("/api/openservice/me?name=admin", auth(name)).statusCode());
+        }
+        assertEquals(405, json("POST", "/api/openservice/me", map(), auth("admin")).statusCode());
+        // An old session must not become a newly created account with the same login name.
+        login("IdentityAgent");
+        try (var db = store.open()) {
+            db.update("DELETE FROM os_user WHERE name='IdentityAgent'");
+            Service.createAccount(
+                    db, map("name", "IdentityAgent", "password", PASSWORD, "role", "admin"));
+            db.connection.commit();
+        }
+        assertEquals(401, get("/api/openservice/me", null).statusCode());
+        assertEquals(200, get("/api/openservice/me", auth("IdentityAgent")).statusCode());
+    }
+
+    @Test
     void oversizedRequestIsRejectedBeforeMutation() throws Exception {
         var response =
                 request(
@@ -502,10 +550,11 @@ abstract class WorkflowSupport {
                                     .get("password");
             for (int i = 0; i < 30; i++)
                 db.update(
-                        "INSERT INTO os_user(name,password,role) VALUES(?,?,?)",
+                        "INSERT INTO os_user(name,password,role,user_id) VALUES(?,?,?,?)",
                         String.format(Locale.ROOT, "evaluator%02d", i),
                         hash,
-                        "reader");
+                        "reader",
+                        id());
             String sql =
                     "INSERT INTO"
                         + " os_record(sys_id,\"table\",data,original,created,updated,creator,updater,revision)"

@@ -40,7 +40,8 @@ class ControllerBoundaryTest {
 
     @Test
     void unusualHttpInputsRespectAuthenticationAndBounds() throws Exception {
-        var controller = new WebController(store());
+        var instance = store();
+        var controller = new WebController(instance);
         var head = request("HEAD", "/healthz");
         assertEquals(200, dispatch(controller, head));
         var invalid = request("GET", "/api/now/table/incident");
@@ -54,7 +55,13 @@ class ControllerBoundaryTest {
         var empty = request("POST", "/api/now/table/incident");
         empty.removeHeader("Authorization");
         empty.addHeader("Authorization", "");
-        empty.getSession().setAttribute("user", "admin");
+        try (var db = instance.open()) {
+            empty.getSession()
+                    .setAttribute(
+                            "user",
+                            db.one("SELECT user_id FROM os_user WHERE name='admin'")
+                                    .get("user_id"));
+        }
         empty.addHeader("X-CSRF-Token", "known-csrf");
         empty.setContentType("application/json");
         empty.setContent(
