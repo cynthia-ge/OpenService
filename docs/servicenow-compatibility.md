@@ -6,7 +6,7 @@ Target: a bounded subset of the **Australia Table API documentation**, accessed 
 
 | ID | Inventory | Capability | Status and boundary |
 |---|---|---|---|
-| OS-001 | A4(a) | Table CRUD and JSON envelopes | Implemented subset: seven configured tables, unversioned routes, bounded parameters. API details in `api.md`. |
+| OS-001 | A4(a) | Table CRUD and JSON envelopes | Implemented subset: seven configured tables, unversioned and v1/v2 routes, bounded parameters. API details in `api.md`. |
 | OS-002 | A1 | Shared schema and persistence | Partial: registry drives validation and forms. No native sys_db_object/sys_dictionary CRUD, table inheritance or typed reference resolution. |
 | OS-003 | A2 | Workspaces, forms, lists | Implemented original UI: overview, record forms, search, paging, dictionary, history and migration. No native UI16/g_form compatibility. |
 | OS-004 | A4(d) | Encoded queries | Partial: equality, inequality, contains, starts-with, IN/NOT IN, AND and ordering; database filtering. No full grammar or scripting. |
@@ -89,3 +89,7 @@ Implemented bounded slice, blueprint A1/A4(a). Australia Attachment API DELETE r
 ## OS-018 — Multipart attachment upload
 
 Implemented bounded slice, blueprint A1/A4(a). Australia Attachment API POST /upload: parent fields in the multipart body, file-part Content-Type, 201 metadata and Location. The official example uses uploadFile. The positive regression failed with 405 before implementation; a second regression using the documented part name failed with 400 before the QA repair. Acceptance passed on SQLite/PostgreSQL for agent/admin and session-CSRF uploads, literal bytes/media type, empty and maximum-size files, metadata/Location, audit persistence, oversized files, forbidden roles, missing/duplicate/extra fields, missing/multiple/wrong file parts, blank/null filenames, absent part media types, query-string rejection and invalid parent/table pairing. Binary and multipart APIs use the same validation and persistence method. Exactly one uploadFile part and the existing local metadata subset are supported. Attachment updates, malware scanning and native field/record ACL parity remain outside this slice. Exact acceptance/coverage and QA base are recorded in [cycle 3](iteration-log.md).
+
+## OS-019 — Versioned Table API routes
+
+Implemented bounded slice, blueprint A4(a). Australia Table API documents /api/now/{api_version}/table paths and examples v1/v2. Its collection contract distinguishes v1 empty results (404) from v2 (200 with an empty result array). The new positive regression returned 404 on creation before implementation. Both database suites verify v1/v2 creation, shared unversioned records, field projection, ETags, update/PUT, stale-revision conflict, role restrictions, deletion, invalid/repeated parameters, empty/filter-empty/out-of-range pages, unsupported versions and version-preserving Location/Link headers. Only the existing bounded Table API subset is versioned. Other historical vendor-version differences, versioned Attachment/Aggregate APIs and complete vendor parity are not claimed. Exact acceptance/coverage and QA base are recorded in [cycle 4](iteration-log.md).

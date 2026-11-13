@@ -67,3 +67,15 @@ QA round 1: one confirmed contract mismatch fixed: the initial implementation re
 Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 262 tests pass, no skipped tests. Exact feature gate: `WebController.java`: 609/609 lines, 304/304 branches, 37/37 methods. Whole Java application: 1112/1112 lines, 604/604 branch outcomes, 89/89 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
 
 Exactly one uploadFile part and the existing local metadata subset are supported. Attachment updates, malware scanning and native field/record ACL parity remain outside this slice. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.
+
+## Cycle 4: OS-019 — Versioned Table API routes
+
+Fixed QA base: `559c62991f5258e848e0d04b8bcfb7a15a8c11c9`; branch `main`, clean starting tree. Blueprint A4(a). Australia Table API documents /api/now/{api_version}/table paths and examples v1/v2. Its collection contract distinguishes v1 empty results (404) from v2 (200 with an empty result array). The new positive regression returned 404 on creation before implementation.
+
+Both database suites verify v1/v2 creation, shared unversioned records, field projection, ETags, update/PUT, stale-revision conflict, role restrictions, deletion, invalid/repeated parameters, empty/filter-empty/out-of-range pages, unsupported versions and version-preserving Location/Link headers.
+
+QA round 1: reviewed both route patterns, unchanged captures/callers, empty-result semantics against the primary reference, authorization/CSRF dispatch, pagination and revision behavior, tests and docs. No new/reopened defects or repairs; all required checks pass. Unresolved: none.
+
+Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 264 tests pass, no skipped tests. Exact feature gate: `WebController.java`: 612/612 lines, 308/308 branches, 37/37 methods. Whole Java application: 1115/1115 lines, 608/608 branch outcomes, 89/89 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
+
+Only the existing bounded Table API subset is versioned. Other historical vendor-version differences, versioned Attachment/Aggregate APIs and complete vendor parity are not claimed. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.

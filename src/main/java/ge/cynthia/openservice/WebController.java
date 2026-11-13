@@ -249,7 +249,7 @@ public class WebController {
             c.session.invalidate();
             return redirect("/login");
         }
-        Matcher collection = Pattern.compile("/api/now/table/([^/]+)").matcher(path);
+        Matcher collection = Pattern.compile("/api/now/(?:v[12]/)?table/([^/]+)").matcher(path);
         if (collection.matches()) {
             method(method, "GET", "POST");
             String table = collection.group(1);
@@ -260,6 +260,8 @@ public class WebController {
                 return json(map("result", Service.serialize(item)), 201);
             }
             var page = Service.page(c.db, table, c.arguments(), "");
+            if (path.startsWith("/api/now/v1/") && page.rows().isEmpty())
+                throw new Failure(404, "No records found");
             c.response.setHeader("X-Total-Count", String.valueOf(page.total()));
             var links = new ArrayList<String>();
             var positions =
@@ -291,7 +293,8 @@ public class WebController {
             c.response.setHeader("Link", String.join(", ", links));
             return json(map("result", page.rows()), 200);
         }
-        Matcher resource = Pattern.compile("/api/now/table/([^/]+)/([^/]+)").matcher(path);
+        Matcher resource =
+                Pattern.compile("/api/now/(?:v[12]/)?table/([^/]+)/([^/]+)").matcher(path);
         if (resource.matches()) {
             method(method, "GET", "PATCH", "PUT", "DELETE");
             String table = resource.group(1);

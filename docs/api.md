@@ -34,7 +34,7 @@ The query subset supports `field=value`, `field!=value`, string `LIKE`, `STARTSW
 
 Writes accept only known editable fields, with string values. Unknown/read-only fields and unsupported query parameters fail. A non-empty summary is required. State transitions are constrained by the OpenService dictionary, and change approval/rejection needs an admin. This intentionally differs from unconstrained native table writes and does not reproduce ServiceNow business rules.
 
-The current error envelope is `{error:{message,detail},status:"failure"}`; messages and exact error semantics are OpenService-specific. No XML, versioned API aliases, OAuth, request impersonation or native script execution is claimed. Source reference: [Australia Table API](https://www.servicenow.com/docs/r/australia/api-reference/rest-apis/c_TableAPI.html), retrieved 2026-11-13; the unversioned documentation URL returned Brazil, so Australia was explicitly selected.
+The current error envelope is `{error:{message,detail},status:"failure"}`; messages and exact error semantics are OpenService-specific. No XML, OAuth, request impersonation or native script execution is claimed. Source reference: [Australia Table API](https://www.servicenow.com/docs/r/australia/api-reference/rest-apis/c_TableAPI.html), retrieved 2026-11-13; the unversioned documentation URL returned Brazil, so Australia was explicitly selected.
 
 ## Count aggregates
 
@@ -64,3 +64,7 @@ Success is 201 with `{result: <metadata>}` and `Location` pointing to the metada
 ### Multipart attachment upload
 
 `POST /api/now/attachment/upload` accepts `multipart/form-data` with exactly the form fields `table_name` and `table_sys_id` and exactly one file part named `uploadFile`, matching the official Australia example. The file part must have a nonblank filename and a concrete Content-Type. Query parameters, repeated/extra fields, missing/multiple/unexpected file parts and blank fields return 400; non-multipart requests or missing/invalid file media types return 415. Missing parents return 404. Binary limits (empty through 5 MiB), filename normalization, role/CSRF checks, metadata/Location, persistence and audit behavior match the raw-file endpoint. Session clients use the `X-CSRF-Token` header. Responses contain the existing local metadata subset, not every native vendor field.
+
+## Versioned Table API routes
+
+The existing Table CRUD subset also accepts `/api/now/v1/table/{table}[/{sys_id}]` and `/api/now/v2/table/{table}[/{sys_id}]`. They share stored records, authentication, role/CSRF rules, input validation, field projection and revision checks. Location and pagination links retain the requested version. In accordance with the Australia reference, a v1 collection read with no returned records yields 404; v2 and unversioned collection reads return 200 with an empty result array. Unsupported versions return 404. These routes implement the documented local subset, not every historical behavior of either vendor API version. Versioned Attachment and Aggregate routes remain outside this slice.

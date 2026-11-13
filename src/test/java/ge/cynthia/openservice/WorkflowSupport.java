@@ -1026,4 +1026,82 @@ abstract class WorkflowSupport {
             assertEquals(0, db.count("SELECT COUNT(*) FROM os_event WHERE action='attachment'"));
         }
     }
+
+    @Test
+    void versionedTableRoutesShareRecordsPermissionsAndRevisions() throws Exception {
+        account("agent", "agent");
+        account("reader", "reader");
+        for (String version : List.of("v1", "v2")) {
+            String path = "/api/now/" + version + "/table/incident";
+            assertEquals(version.equals("v1") ? 404 : 200, get(path, auth("admin")).statusCode());
+
+            assertEquals(401, get(path, null).statusCode());
+            assertEquals(
+                    403,
+                    json("POST", path, map("short_description", "Denied"), auth("reader"))
+                            .statusCode());
+            var created =
+                    json(
+                            "POST",
+                            path,
+                            map("short_description", "Versioned " + version),
+                            auth("agent"));
+            assertEquals(201, created.statusCode(), html(created));
+            var record = object(parsed(created).get("result"));
+            String resource = path + "/" + record.get("sys_id");
+            assertEquals(base() + resource, created.headers().firstValue("Location").orElseThrow());
+            assertEquals(
+                    record,
+                    parsed(get("/api/now/table/incident/" + record.get("sys_id"), auth("reader")))
+                            .get("result"));
+            var read = get(resource + "?sysparm_fields=sys_id,short_description", auth("reader"));
+            assertEquals(200, read.statusCode());
+            assertEquals("\"0\"", read.headers().firstValue("ETag").orElseThrow());
+            assertEquals(
+                    Set.of("sys_id", "short_description"),
+                    object(parsed(read).get("result")).keySet());
+            var list = get(path + "?sysparm_limit=1", auth("reader"));
+            assertEquals(200, list.statusCode());
+            assertTrue(list.headers().firstValue("Link").orElseThrow().contains(path + "?"));
+            assertEquals(
+                    200,
+                    json("PATCH", resource, map("short_description", "Patched"), auth("agent"))
+                            .statusCode());
+            var stale =
+                    client.send(
+                            HttpRequest.newBuilder(URI.create(base() + resource))
+                                    .header("Authorization", auth("agent"))
+                                    .header("Content-Type", "application/json")
+                                    .header("If-Match", "\"0\"")
+                                    .method(
+                                            "PATCH",
+                                            HttpRequest.BodyPublishers.ofString(
+                                                    "{\"short_description\":\"Stale\"}"))
+                                    .build(),
+                            HttpResponse.BodyHandlers.ofByteArray());
+            assertEquals(409, stale.statusCode());
+            assertEquals(
+                    200,
+                    json("PUT", resource, map("short_description", "Replaced"), auth("agent"))
+                            .statusCode());
+            assertEquals(403, json("DELETE", resource, map(), auth("agent")).statusCode());
+            assertEquals(400, get(path + "?unsupported=1", auth("admin")).statusCode());
+            assertEquals(
+                    version.equals("v1") ? 404 : 200,
+                    get(path + "?sysparm_query=sys_id%3Dmissing", auth("admin")).statusCode());
+            assertEquals(
+                    version.equals("v1") ? 404 : 200,
+                    get(path + "?sysparm_offset=2147483647", auth("admin")).statusCode());
+
+            assertEquals(
+                    400,
+                    get(path + "?sysparm_limit=1&sysparm_limit=2", auth("admin")).statusCode());
+            assertEquals(204, json("DELETE", resource, map(), auth("admin")).statusCode());
+            assertEquals(404, get(resource, auth("admin")).statusCode());
+        }
+        for (String version : List.of("v0", "v3", "v99", "V1"))
+            assertEquals(
+                    404,
+                    get("/api/now/" + version + "/table/incident", auth("admin")).statusCode());
+    }
 }
