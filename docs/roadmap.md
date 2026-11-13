@@ -116,3 +116,5 @@ ADOPT-05 now includes administrator-controlled deactivation/reactivation, cross-
 ADOPT-05 now also includes guarded local role changes with session revocation and concurrent final-administrator protection. Password management, group memberships, scoped permissions and lifecycle audit remain open. See platform cycle 5.
 
 ADOPT-05/08 now include self-service password changes with current-secret verification, concurrent-update protection and session revocation. Forgotten-password recovery, invitations, security-event audit, password screening and authentication throttling remain open. See platform cycle 6.
+
+ADOPT-09 now includes a transactional lifecycle-event journal and administrator UI/API with secret exclusion. Authentication attempts, retention/export, tamper-resistant storage and SIEM forwarding remain open. See platform cycle 7.

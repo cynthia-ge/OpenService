@@ -305,6 +305,12 @@ public class WebController {
             if (api && !object(body(c)).isEmpty())
                 throw new Failure(400, "Provide an empty JSON object");
             Service.revokeSessions(c.db, c.user.get("user_id").toString());
+            SecurityEvents.record(
+                    c.db,
+                    c.user.get("user_id").toString(),
+                    c.user.get("user_id").toString(),
+                    "account.sessions_revoked",
+                    map());
             c.session.invalidate();
             return api ? json(map("result", map("revoked", true)), 200) : redirect("/login");
         }
@@ -415,6 +421,15 @@ public class WebController {
                                     c.role())),
                     200);
         }
+        if (Set.of("/admin/security-events", "/api/openservice/security-events").contains(path)) {
+            method(method, "GET");
+            c.admin();
+            c.noQuery();
+            var events = SecurityEvents.latest(c.db);
+            return path.startsWith("/api/")
+                    ? json(map("result", events), 200)
+                    : view(c, "security-events", map("table", "security", "events", events));
+        }
         Matcher accountRole =
                 Pattern.compile("/api/openservice/users/([0-9a-f]{32})/role").matcher(path);
         if (accountRole.matches()) {
@@ -452,7 +467,12 @@ public class WebController {
         if (path.equals("/api/openservice/users")) {
             method(method, "POST");
             c.admin();
-            return json(map("result", Service.createAccount(c.db, body(c))), 201);
+            return json(
+                    map(
+                            "result",
+                            Service.createManagedAccount(
+                                    c.db, body(c), c.user.get("user_id").toString())),
+                    201);
         }
         Matcher importing = Pattern.compile("/api/openservice/import/([^/]+)").matcher(path);
         if (importing.matches()) {
@@ -744,7 +764,7 @@ public class WebController {
             values = map("name", c.parameter("name", ""), "role", c.parameter("role", "reader"));
             try {
                 var account =
-                        Service.createAccount(
+                        Service.createManagedAccount(
                                 c.db,
                                 map(
                                         "name",
@@ -752,7 +772,8 @@ public class WebController {
                                         "role",
                                         values.get("role"),
                                         "password",
-                                        c.parameter("password", "")));
+                                        c.parameter("password", "")),
+                                c.user.get("user_id").toString());
                 c.session.setAttribute(
                         "flash",
                         "Account for " + account.get("name") + " created. They can now sign in.");

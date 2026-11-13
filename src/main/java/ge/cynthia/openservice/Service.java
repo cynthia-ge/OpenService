@@ -431,6 +431,12 @@ public final class Service {
             throw new Failure(409, "Keep at least one active administrator");
         db.update("UPDATE os_user SET active=? WHERE user_id=?", active ? 1 : 0, userId);
         revokeSessions(db, userId);
+        SecurityEvents.record(
+                db,
+                actorId,
+                userId,
+                "account.state_changed",
+                map("before", user.get("active"), "after", active));
         return account(db, userId);
     }
 
@@ -458,6 +464,12 @@ public final class Service {
             throw new Failure(409, "Keep at least one active administrator");
         db.update("UPDATE os_user SET role=? WHERE user_id=?", role, userId);
         revokeSessions(db, userId);
+        SecurityEvents.record(
+                db,
+                actorId,
+                userId,
+                "account.role_changed",
+                map("before", user.get("role"), "after", role));
         return account(db, userId);
     }
 
@@ -483,10 +495,24 @@ public final class Service {
         db.update(
                 "UPDATE os_user SET password=? WHERE user_id=?", Passwords.hash(password), userId);
         revokeSessions(db, userId);
+        SecurityEvents.record(db, userId, userId, "account.password_changed", map());
     }
 
     public static void revokeSessions(Store.Db db, String userId) throws SQLException {
         db.update("UPDATE os_user SET auth_revision=auth_revision+1 WHERE user_id=?", userId);
+    }
+
+    public static Map<String, Object> createManagedAccount(Store.Db db, Object body, String actorId)
+            throws Exception {
+        requireAccountAdministrator(db, actorId);
+        var result = createAccount(db, body);
+        String target =
+                db.one("SELECT user_id FROM os_user WHERE name=?", result.get("name"))
+                        .get("user_id")
+                        .toString();
+        SecurityEvents.record(
+                db, actorId, target, "account.created", map("role", result.get("role")));
+        return result;
     }
 
     public static Map<String, Object> createAccount(Store.Db db, Object body) throws Exception {

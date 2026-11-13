@@ -1,0 +1,4 @@
+<!doctype html><html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{base :: layout(~{::main})}"><main>
+<section class="page-heading"><div><span class="eyebrow">ACCOUNT OVERSIGHT</span><h1>Security events</h1><p>The latest 100 committed account changes. Authentication attempts and external security monitoring are separate.</p></div></section>
+<section class="panel"><div class="table-scroll"><table aria-label="Account security events"><thead><tr><th>When</th><th>Actor</th><th>Account</th><th>Action</th><th>Changes</th></tr></thead><tbody><tr th:each="event:${events}"><td th:text="${event.occurred_at}"></td><td th:text="${event.actor_name}"></td><td th:text="${event.target_name}"></td><td th:text="${event.action}"></td><td th:text="${event.detail}"></td></tr></tbody></table><p th:if="${#lists.isEmpty(events)}">No account changes recorded yet.</p></div></section>
+</main></html>

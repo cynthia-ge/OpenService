@@ -134,7 +134,7 @@ class ControllerBoundaryTest {
                 });
         assertEquals(400, dispatch(controller, api));
         try (var mocked = mockStatic(Service.class)) {
-            mocked.when(() -> Service.createAccount(any(), any()))
+            mocked.when(() -> Service.createManagedAccount(any(), any(), any()))
                     .thenThrow(new Failure(403, "Account creation denied"));
             assertEquals(403, dispatch(controller, request("POST", "/admin/accounts")));
         }

@@ -142,6 +142,17 @@ class BrowserTest {
                             .get(base() + "/api/openservice/me")
                             .text()
                             .contains("\"role\":\"reader\""));
+            admin.getByRole(
+                            AriaRole.LINK,
+                            new Page.GetByRoleOptions().setName("Security events").setExact(true))
+                    .click();
+            admin.getByRole(
+                            AriaRole.HEADING,
+                            new Page.GetByRoleOptions().setName("Security events").setExact(true))
+                    .waitFor();
+            assertTrue(admin.getByRole(AriaRole.TABLE).innerText().contains(name));
+            assertTrue(
+                    admin.getByRole(AriaRole.TABLE).innerText().contains("account.role_changed"));
             admin.setViewportSize(390, 844);
             assertTrue(
                     (Boolean) admin.evaluate("document.documentElement.scrollWidth <= innerWidth"));

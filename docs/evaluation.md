@@ -40,3 +40,5 @@ For a broader review, use [Migration studio](migration.md) to preview a small sy
 - What availability, recovery, upgrade and performance targets would a pilot need?
 
 SSO, granular ACLs/domain isolation, password reset, comprehensive lifecycle controls and high availability remain incomplete; versioned upgrades now exist but operational restore drills remain unverified. Existing Docker/browser tests demonstrate the documented evaluation workflows; they do not establish production readiness or complete ServiceNow compatibility.
+
+Use **Security events** as an administrator to review successful account changes. Failed attempts are not part of this journal; it shows the latest 100 recorded lifecycle events and does not replace external security monitoring.

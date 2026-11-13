@@ -28,11 +28,113 @@ abstract class WorkflowSupport {
                         .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
                         .build();
         try (var db = store.open()) {
-            for (String table : List.of("os_attachment", "os_event", "os_record"))
+            for (String table :
+                    List.of("os_attachment", "os_event", "os_record", "os_security_event"))
                 db.update("DELETE FROM " + table);
             db.update("DELETE FROM os_user WHERE name<>?", "admin");
             db.connection.commit();
         }
+    }
+
+    @Test
+    void securityEventsRecordCommittedLifecycleChangesWithoutSecrets() throws Exception {
+        String api = "/api/openservice/security-events";
+        assertTrue(objects(parsed(get(api, auth("admin"))).get("result")).isEmpty());
+        account("AuditReader", "reader");
+        String target =
+                object(parsed(get("/api/openservice/me", auth("AuditReader"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String actor =
+                object(parsed(get("/api/openservice/me", auth("admin"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        assertEquals(403, get(api, auth("AuditReader")).statusCode());
+        assertEquals(403, get("/admin/security-events", auth("AuditReader")).statusCode());
+        assertEquals(405, json("POST", api, map(), auth("admin")).statusCode());
+        assertEquals(400, get(api + "?limit=1", auth("admin")).statusCode());
+        assertEquals(400, get("/admin/security-events?x=1", auth("admin")).statusCode());
+        json(
+                "PATCH",
+                "/api/openservice/users/" + target + "/role",
+                map("role", "agent"),
+                auth("admin"));
+        json(
+                "PATCH",
+                "/api/openservice/users/" + target + "/role",
+                map("role", "agent"),
+                auth("admin"));
+        json(
+                "PATCH",
+                "/api/openservice/users/" + target + "/status",
+                map("active", false),
+                auth("admin"));
+        json(
+                "PATCH",
+                "/api/openservice/users/" + target + "/status",
+                map("active", true),
+                auth("admin"));
+        json("POST", "/api/openservice/me/sessions/revoke", map(), auth("AuditReader"));
+        json(
+                "POST",
+                "/api/openservice/me/password",
+                map("current_password", PASSWORD, "new_password", "secret-not-in-events"),
+                auth("AuditReader"));
+        var events = objects(parsed(get(api, auth("admin"))).get("result"));
+        assertEquals(6, events.size());
+        assertEquals(
+                List.of(
+                        "account.password_changed",
+                        "account.sessions_revoked",
+                        "account.state_changed",
+                        "account.state_changed",
+                        "account.role_changed",
+                        "account.created"),
+                events.stream().map(event -> event.get("action")).toList());
+        assertEquals(map("before", "reader", "after", "agent"), events.get(4).get("detail"));
+        assertEquals(actor, events.get(5).get("actor_id"));
+        assertEquals(target, events.get(5).get("target_id"));
+        assertEquals("AuditReader", events.get(5).get("target_name"));
+        assertEquals(
+                Set.of(
+                        "event_id",
+                        "occurred_at",
+                        "actor_id",
+                        "actor_name",
+                        "target_id",
+                        "target_name",
+                        "action",
+                        "detail"),
+                events.get(0).keySet());
+        assertFalse(JSON.writeValueAsString(events).contains(PASSWORD));
+        assertFalse(JSON.writeValueAsString(events).contains("secret-not-in-events"));
+        assertFalse(JSON.writeValueAsString(events).contains("pbkdf2"));
+        try (var db = store.open()) {
+            Service.changeRole(db, actor, target, map("role", "admin"));
+            db.connection.rollback();
+            assertEquals(6, db.count("SELECT COUNT(*) FROM os_security_event"));
+            assertEquals("agent", Service.account(db, target).get("role"));
+        }
+        assertEquals(
+                400,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + target + "/role",
+                                map("role", "bad"),
+                                auth("admin"))
+                        .statusCode());
+        new Store(environment);
+        assertEquals(events, objects(parsed(get(api, auth("admin"))).get("result")));
+        try (var db = store.open()) {
+            for (int n = 0; n < 101; n++)
+                SecurityEvents.record(db, actor, target, "test.fixture", map("index", n));
+            db.connection.commit();
+        }
+        events = objects(parsed(get(api, auth("admin"))).get("result"));
+        assertEquals(100, events.size());
+        assertEquals(100, object(events.get(0).get("detail")).get("index"));
+        assertEquals(1, object(events.get(99).get("detail")).get("index"));
+        assertEquals(200, get("/admin/security-events", auth("admin")).statusCode());
     }
 
     @Test

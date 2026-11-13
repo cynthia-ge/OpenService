@@ -145,3 +145,7 @@ Implemented local ADOPT-05 slice: administrator UI/API role changes, transaction
 ## OS-031 — Authenticated password changes
 
 Implemented local ADOPT-05/08 slice: current-secret verification, bounded password validation, transactional update and all-browser revocation, UI/API for every local role, and concurrent replay rejection. Native password-reset applications, MFA, notification delivery and recovery are not claimed. See [cycle 6](platform-foundations.md).
+
+## OS-032 — Account lifecycle security journal
+
+Implemented local ADOPT-09 slice: transactionally persisted successful account changes with stable attribution, sanitized details, administrator UI/API and a deterministic 100-event window. Native sys_audit_role/identity plugins, login logging and tamper-resistant archives are not claimed. See [cycle 7](platform-foundations.md).

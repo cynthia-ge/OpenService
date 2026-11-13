@@ -4,7 +4,7 @@ import java.sql.SQLException;
 
 /** Ordered, transactional upgrades. The caller commits schema and bootstrap data together. */
 final class Migrations {
-    static final int VERSION = 4;
+    static final int VERSION = 5;
 
     private Migrations() {}
 
@@ -54,6 +54,20 @@ final class Migrations {
             db.update(
                     "INSERT INTO os_migration(version,name) VALUES(4,?)",
                     "account activation state");
+        }
+        if (version < 5) {
+            db.update(
+                    "CREATE TABLE IF NOT EXISTS os_security_event (sequence "
+                            + (db.postgres
+                                    ? "BIGSERIAL PRIMARY KEY"
+                                    : "INTEGER PRIMARY KEY AUTOINCREMENT")
+                            + ",event_id VARCHAR(32) NOT NULL UNIQUE,occurred_at VARCHAR(40) NOT"
+                            + " NULL,actor_id VARCHAR(32) NOT NULL,actor_name VARCHAR(80) NOT"
+                            + " NULL,target_id VARCHAR(32) NOT NULL,target_name VARCHAR(80) NOT"
+                            + " NULL,action VARCHAR(64) NOT NULL,detail TEXT NOT NULL)");
+            db.update(
+                    "INSERT INTO os_migration(version,name) VALUES(5,?)",
+                    "account security events");
         }
     }
 
