@@ -132,3 +132,5 @@ ADOPT-04 is now partial: manual single-use, 24-hour invitation issuance, replace
 ADOPT-05/08/09 now include administrator-assisted, reauthenticated 15-minute recovery links with target/issuer revision binding, explicit revocation, atomic credential/session replacement and lifecycle events. Manual recipient verification/delivery, no-administrator recovery, throttling and full identity integrations remain open. See platform cycle 10. All ten cycles are local commits; no publishing or deployment is authorized by this tranche.
 
 Cycle 11 / ADOPT-06: private-account record visibility now spans UI/API reads and mutations, lists/counts/export/audit/attachments, including retained audit after deletion. Existing records remain workspace-visible until explicitly restricted. Field ACLs, requester defaults, group memberships and multi-organization isolation remain open; M1 is unmet.
+
+Cycle 12 / ADOPT-03/06: persistent group membership now has administrator UI/API, idempotence, audit and deletion cleanup. Inherited roles, team record visibility, requester defaults and field ACLs remain separate work. M1 remains unmet.

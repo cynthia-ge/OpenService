@@ -48,6 +48,50 @@ class BrowserTest {
     }
 
     @Test
+    void administratorAddsAndRemovesAGroupMemberInTheBrowser() throws Exception {
+        String name = "GroupBrowser" + id().substring(0, 8), group;
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db, map("name", name, "role", "reader", "password", WorkflowSupport.PASSWORD));
+            group =
+                    Service.create(
+                                    db,
+                                    "sys_user_group",
+                                    map("short_description", "Browser group"),
+                                    "admin")
+                            .get("sys_id")
+                            .toString();
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var context = browser.newContext()) {
+            var page = context.newPage();
+            login(page, "admin");
+            page.navigate(base() + "/record/sys_user_group/" + group);
+            page.getByLabel("Member username").fill(name);
+            page.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Add member").setExact(true))
+                    .click();
+            page.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Remove " + name).setExact(true))
+                    .click();
+            page.getByRole(AriaRole.HEADING, new Page.GetByRoleOptions().setName("Group members"))
+                    .waitFor();
+            assertEquals(
+                    0,
+                    page.getByRole(
+                                    AriaRole.BUTTON,
+                                    new Page.GetByRoleOptions().setName("Remove " + name))
+                            .count());
+            page.setViewportSize(390, 844);
+            assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth<=innerWidth"));
+        }
+    }
+
+    @Test
     void administratorMakesARecordPrivateThroughTheBrowser() throws Exception {
         String name = "PrivateBrowser" + id().substring(0, 8), record;
         try (var db = store.open()) {

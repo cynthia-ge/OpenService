@@ -165,3 +165,7 @@ Implemented local ADOPT-05/08/09 slice: administrator reauthentication, one-time
 ## OS-036 — Private account record visibility
 
 Implemented local ADOPT-06 slice: administrator-selected private owner and consistent visibility across existing record surfaces. This is a local extension, not ServiceNow's programmable ACL engine. See [cycle 11](platform-foundations.md) for evidence, scope and exact counters.
+
+## OS-037 — Group membership administration
+
+Implemented local ADOPT-03 slice: administrator roster, add/remove, persistence, audit and cleanup. Australia group concepts are mapped, while group-role inheritance remains missing. See [cycle 12](platform-foundations.md) for acceptance and exact counters.

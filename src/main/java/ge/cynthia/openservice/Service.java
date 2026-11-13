@@ -233,6 +233,7 @@ public final class Service {
             throws SQLException {
         audit(db, item, actor, "deleted", map("before", serialize(item)));
         db.update("DELETE FROM os_attachment WHERE record_id=?", item.get("sys_id"));
+        db.update("DELETE FROM os_group_member WHERE group_id=?", item.get("sys_id"));
         db.update("DELETE FROM os_record WHERE sys_id=?", item.get("sys_id"));
     }
 

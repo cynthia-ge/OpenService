@@ -388,6 +388,49 @@ public class WebController {
             c.session.invalidate();
             return api ? json(map("result", map("revoked", true)), 200) : redirect("/login");
         }
+        Matcher membership =
+                Pattern.compile(
+                                "/api/openservice/groups/([0-9a-f]{32})/members(?:/([0-9a-f]{32}))?")
+                        .matcher(path);
+        if (membership.matches()) {
+            c.admin();
+            c.noQuery();
+            String group = membership.group(1), member = membership.group(2);
+            method(method, member == null ? new String[] {"GET", "PUT"} : new String[] {"DELETE"});
+            Service.record(c.db, "sys_user_group", group);
+            var result =
+                    method.equals("GET")
+                            ? GroupMembers.list(c.db, group)
+                            : GroupMembers.change(
+                                    c.db,
+                                    group,
+                                    c.user.get("user_id").toString(),
+                                    member == null ? body(c) : map("user_id", member),
+                                    method.equals("PUT"));
+            return json(map("result", result), 200);
+        }
+        Matcher memberForm = Pattern.compile("/group-members/([0-9a-f]{32})").matcher(path);
+        if (memberForm.matches()) {
+            method(method, "POST");
+            c.admin();
+            c.noQuery();
+            c.uniqueQuery();
+            String operation = c.parameter("operation", "");
+            if (!Set.of("add", "remove").contains(operation))
+                throw new Failure(400, "Choose add or remove");
+            boolean add = operation.equals("add");
+            String member =
+                    add
+                            ? RecordAccess.owner(c.db, c.parameter("username", ""))
+                            : c.parameter("user_id", "");
+            GroupMembers.change(
+                    c.db,
+                    memberForm.group(1),
+                    c.user.get("user_id").toString(),
+                    map("user_id", member),
+                    add);
+            return redirect("/record/sys_user_group/" + memberForm.group(1));
+        }
         Matcher access =
                 Pattern.compile("/(api/openservice/access|record-access)/([^/]+)/([0-9a-f]{32})")
                         .matcher(path);
@@ -857,6 +900,10 @@ public class WebController {
                         data,
                         "access",
                         item == null ? map() : RecordAccess.status(c.db, id),
+                        "members",
+                        item != null && table.equals("sys_user_group") && c.role().equals("admin")
+                                ? GroupMembers.list(c.db, id)
+                                : List.of(),
                         "stateChoices",
                         choices,
                         "currentState",

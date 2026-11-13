@@ -36,10 +36,125 @@ abstract class WorkflowSupport {
                             "os_security_event",
                             "os_invitation",
                             "os_recovery",
-                            "os_record_access")) db.update("DELETE FROM " + table);
+                            "os_record_access",
+                            "os_group_member")) db.update("DELETE FROM " + table);
             db.update("DELETE FROM os_user WHERE name<>?", "admin");
             db.connection.commit();
         }
+    }
+
+    @Test
+    void administratorManagesPersistentGroupMembershipWithoutRoleEscalation() throws Exception {
+        account("GroupAgent", "agent");
+        account("GroupReader", "reader");
+        String user =
+                object(parsed(get("/api/openservice/me", auth("GroupReader"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String group = add("sys_user_group").get("sys_id").toString(),
+                api = "/api/openservice/groups/" + group + "/members",
+                page = "/record/sys_user_group/" + group;
+        assertEquals(401, get(api, null).statusCode());
+        for (String actor : List.of("GroupReader", "GroupAgent")) {
+            assertEquals(403, get(api, auth(actor)).statusCode());
+            assertEquals(403, json("PUT", api, map("user_id", user), auth(actor)).statusCode());
+            assertFalse(html(get(page, auth(actor))).contains("Add member"));
+        }
+        assertEquals(List.of(), parsed(get(api, auth("admin"))).get("result"));
+        assertEquals(405, json("POST", api, map(), auth("admin")).statusCode());
+        assertEquals(400, get(api + "?x=1", auth("admin")).statusCode());
+        assertEquals(
+                404,
+                get(api.replace(group, add("incident").get("sys_id").toString()), auth("admin"))
+                        .statusCode());
+        for (Object bad : List.of(map(), map("user_id", 1), map("user_id", "missing")))
+            assertEquals(400, json("PUT", api, bad, auth("admin")).statusCode());
+        assertEquals(200, json("PUT", api, map("user_id", user), auth("admin")).statusCode());
+        assertEquals(200, json("PUT", api, map("user_id", user), auth("admin")).statusCode());
+        new Store(environment);
+        var members = objects(parsed(get(api, auth("admin"))).get("result"));
+        assertEquals(1, members.size());
+        assertEquals(Set.of("user_id", "name", "role", "active"), members.getFirst().keySet());
+        assertEquals("reader", members.getFirst().get("role"));
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + user + "/status",
+                                map("active", false),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(400, json("PUT", api, map("user_id", user), auth("admin")).statusCode());
+        assertEquals(
+                0,
+                ((Number)
+                                objects(parsed(get(api, auth("admin"))).get("result"))
+                                        .getFirst()
+                                        .get("active"))
+                        .intValue());
+        assertEquals(200, json("DELETE", api + "/" + user, map(), auth("admin")).statusCode());
+        assertEquals(200, json("DELETE", api + "/" + user, map(), auth("admin")).statusCode());
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + user + "/status",
+                                map("active", true),
+                                auth("admin"))
+                        .statusCode());
+        String csrf = login("admin"), form = "/group-members/" + group;
+        assertEquals(
+                403,
+                form(form, map("operation", "add", "username", "GroupReader"), null).statusCode());
+        assertEquals(400, form(form, map("operation", "bad", "csrf", csrf), null).statusCode());
+        assertEquals(
+                400,
+                form(form, map("operation", "add", "username", "missing", "csrf", csrf), null)
+                        .statusCode());
+        assertEquals(
+                302,
+                form(form, map("operation", "add", "username", "GroupReader", "csrf", csrf), null)
+                        .statusCode());
+        assertTrue(html(get(page, null)).contains("Remove GroupReader"));
+        assertEquals(
+                302,
+                form(form, map("operation", "remove", "user_id", user, "csrf", csrf), null)
+                        .statusCode());
+        assertEquals(List.of(), parsed(get(api, auth("admin"))).get("result"));
+        try (var db = store.open()) {
+            assertEquals(
+                    2,
+                    db.count(
+                            "SELECT COUNT(*) FROM os_event WHERE record_id=? AND"
+                                + " action='member_added'",
+                            group));
+            assertEquals(
+                    2,
+                    db.count(
+                            "SELECT COUNT(*) FROM os_event WHERE record_id=? AND"
+                                + " action='member_removed'",
+                            group));
+        }
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var first =
+                    executor.submit(() ->
+                            json("PUT", api, map("user_id", user), auth("admin")).statusCode());
+            var second =
+                    executor.submit(() ->
+                            json("PUT", api, map("user_id", user), auth("admin")).statusCode());
+            assertEquals(200, first.get());
+            assertEquals(200, second.get());
+        }
+        assertEquals(1, objects(parsed(get(api, auth("admin"))).get("result")).size());
+        assertEquals(
+                204,
+                json("DELETE", "/api/now/table/sys_user_group/" + group, map(), auth("admin"))
+                        .statusCode());
+        try (var db = store.open()) {
+            assertEquals(
+                    0, db.count("SELECT COUNT(*) FROM os_group_member WHERE group_id=?", group));
+        }
+        assertEquals(404, json("PUT", api, map("user_id", user), auth("admin")).statusCode());
     }
 
     @Test

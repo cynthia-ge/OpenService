@@ -138,3 +138,7 @@ Administrator-only `/api/openservice/invitations` supports GET (latest 100 sanit
 ## Record visibility
 
 Administrator-only PATCH `/api/openservice/access/{table}/{sys_id}` accepts exactly `{"visibility":"private","owner_id":"active-user-id"}` or `{"visibility":"workspace","owner_id":""}`. It returns visibility, owner_id and owner username; invalid input returns 400, unauthorized actors 403, unknown records 404. Record-detail pages offer the same CSRF-protected operation by username. Private records are available only to their selected user and administrators, subject to existing role mutation restrictions. Lists/counts/exports/audit/attachments use the same visibility filter; direct denied resources return 404. Deleted private-record audit remains restricted. Fields, groups and shared tenancy are separate capabilities.
+
+## Group membership
+
+Administrator-only GET `/api/openservice/groups/{group_id}/members` lists `user_id`, `name`, `role`, and numeric `active` for members of an existing `sys_user_group` record. PUT accepts exactly `{"user_id":"active-user-id"}`; DELETE `/api/openservice/groups/{group_id}/members/{user_id}` removes membership. Writes return the resulting roster with 200. Repeats are idempotent; invalid input/inactive additions return 400, unauthorized roles 403, and missing/wrong-table groups 404. Query arguments are rejected. Group record pages provide CSRF-protected add/remove controls. Membership does not change account roles; deactivation preserves it, group deletion removes it. Audit records effective changes only.
