@@ -409,6 +409,35 @@ public final class Service {
         return result;
     }
 
+    public static Map<String, Object> account(Store.Db db, String userId) throws SQLException {
+        var user = db.one("SELECT user_id,name,role,active FROM os_user WHERE user_id=?", userId);
+        if (user == null) throw new Failure(404, "User not found");
+        user.put("active", ((Number) user.get("active")).intValue() == 1);
+        return user;
+    }
+
+    public static Map<String, Object> changeActive(
+            Store.Db db, String actorId, String userId, Object body) throws SQLException {
+        var value = object(body);
+        if (!value.keySet().equals(Set.of("active"))
+                || !(value.get("active") instanceof Boolean active))
+            throw new Failure(400, "Provide one boolean active field");
+        if (db.postgres) db.all("SELECT pg_advisory_xact_lock(18439,2)");
+        if (db.one(
+                        "SELECT user_id FROM os_user WHERE user_id=? AND active=1 AND role='admin'",
+                        actorId)
+                == null) throw new Failure(403, "Active administrator required");
+        var user = account(db, userId);
+        if (user.get("active").equals(active)) return user;
+        if (user.get("role").equals("admin")
+                && !active
+                && db.count("SELECT COUNT(*) FROM os_user WHERE role='admin' AND active=1") <= 1)
+            throw new Failure(409, "Keep at least one active administrator");
+        db.update("UPDATE os_user SET active=? WHERE user_id=?", active ? 1 : 0, userId);
+        revokeSessions(db, userId);
+        return account(db, userId);
+    }
+
     public static void revokeSessions(Store.Db db, String userId) throws SQLException {
         db.update("UPDATE os_user SET auth_revision=auth_revision+1 WHERE user_id=?", userId);
     }

@@ -110,3 +110,5 @@ The [platform implementation contract](platform-foundations.md) records the prov
 ADOPT-03 now includes stable user identities, migration/backfill, session binding and a current-account API. Memberships, profiles/email and lifecycle controls remain open; this does not complete ADOPT-03 or M1. See platform cycle 2.
 
 ADOPT-05/08 now include persistent all-browser session revocation and an account-security page. Account deactivation, role changes, password management, rate limits and absolute session lifetime remain open. See platform cycle 3.
+
+ADOPT-05 now includes administrator-controlled deactivation/reactivation, cross-entry-point account-state enforcement and concurrent last-active-administrator protection. Role changes, password recovery and complete offboarding/ownership transfer remain open. ADOPT-09 security events and ADOPT-06 resource isolation are still prerequisites. See platform cycle 4.

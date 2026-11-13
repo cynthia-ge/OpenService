@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{base :: layout(~{::main})}"><main>
+<section class="page-heading"><div><span class="eyebrow">ACCOUNT ADMINISTRATION</span><h1 th:text="${account.name}">Account</h1><p>Control whether this person can sign in.</p></div><a href="/admin/accounts" class="button">All accounts</a></section>
+<section class="panel"><div class="panel-heading"><h2>Account access</h2></div>
+<div th:if="${error!=null}" class="notice" role="alert" th:text="${error}"></div>
+<p>Making an account inactive blocks sign-in and API access and signs out its browsers on their next request. Records and history remain available. Reactivation requires a fresh sign-in.</p>
+<form method="post" class="record-form"><input type="hidden" name="csrf" th:value="${csrf}">
+<label for="account-active">Account status</label><select id="account-active" name="active"><option value="true" th:selected="${account.active}">Active</option><option value="false" th:selected="${!account.active}">Inactive</option></select>
+<button class="button primary">Save account status</button></form></section>
+</main></html>

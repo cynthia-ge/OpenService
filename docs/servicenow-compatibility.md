@@ -133,3 +133,7 @@ Implemented local identity slice, ADOPT-03 / blueprint A1/A4(e): migration backf
 ## OS-028 — Persistent browser-session revocation
 
 Implemented local ADOPT-05/08 slice: persistent authentication revisions, next-request invalidation of all caller browser sessions, self-service UI/API for every role, CSRF protection and fresh-login recovery. No individual-session directory, account lockout, SSO or ServiceNow session API parity is claimed. See [cycle 3](platform-foundations.md).
+
+## OS-029 — Administrator account-state lifecycle
+
+Implemented local ADOPT-05 slice: active/inactive migration, administrator UI/API, denied inactive authentication on every supported path, revocation on effective state changes, idempotency, persistent reactivation and concurrent last-active-administrator protection. Identities, passwords and attribution are preserved. Native sys_user, vendor reference-picker rules and delegated roles are not claimed. See [cycle 4](platform-foundations.md).

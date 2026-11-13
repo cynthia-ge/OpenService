@@ -48,6 +48,44 @@ class BrowserTest {
     }
 
     @Test
+    void administratorCanChangeAccountStatusAndUserMustSignInAgain() throws Exception {
+        String name = "OffboardBrowser" + id().substring(0, 8);
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db, map("name", name, "password", WorkflowSupport.PASSWORD, "role", "agent"));
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var administrators = browser.newContext();
+                var users = browser.newContext()) {
+            var admin = administrators.newPage();
+            var user = users.newPage();
+            login(admin, "admin");
+            login(user, name);
+            admin.navigate(base() + "/admin/accounts");
+            admin.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName(name).setExact(true))
+                    .click();
+            admin.getByLabel("Account status").selectOption("false");
+            admin.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Save account status"))
+                    .click();
+            user.navigate(base() + "/account");
+            user.waitForURL("**/login");
+            admin.getByLabel("Account status").selectOption("true");
+            admin.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Save account status"))
+                    .click();
+            login(user, name);
+            admin.setViewportSize(390, 844);
+            assertTrue(
+                    (Boolean) admin.evaluate("document.documentElement.scrollWidth <= innerWidth"));
+        }
+    }
+
+    @Test
     void readerCanSignOutAllBrowsersFromAccountSecurity() throws Exception {
         String name = "SecurityReader" + id().substring(0, 8);
         try (var db = store.open()) {

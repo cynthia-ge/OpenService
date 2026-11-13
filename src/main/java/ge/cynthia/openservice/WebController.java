@@ -113,7 +113,7 @@ public class WebController {
                     session.getAttribute("user") == null
                             ? null
                             : db.one(
-                                    "SELECT * FROM os_user WHERE user_id=?",
+                                    "SELECT * FROM os_user WHERE user_id=? AND active=1",
                                     session.getAttribute("user"));
             if (user != null
                     && !Objects.equals(
@@ -176,7 +176,7 @@ public class WebController {
                                     Base64.getDecoder().decode(header.substring(6)),
                                     StandardCharsets.UTF_8)
                             .split(":", 2);
-            var user = db.one("SELECT * FROM os_user WHERE name=?", pair[0]);
+            var user = db.one("SELECT * FROM os_user WHERE name=? AND active=1", pair[0]);
             if (pair.length != 2
                     || user == null
                     || !Passwords.matches((String) user.get("password"), pair[1]))
@@ -241,7 +241,9 @@ public class WebController {
             if (method.equals("POST")) {
                 checkCsrf(c, c.parameter("csrf", ""));
                 var user =
-                        c.db.one("SELECT * FROM os_user WHERE name=?", c.parameter("username", ""));
+                        c.db.one(
+                                "SELECT * FROM os_user WHERE name=? AND active=1",
+                                c.parameter("username", ""));
                 if (user == null
                         || !Passwords.matches(
                                 (String) user.get("password"), c.parameter("password", "")))
@@ -385,6 +387,24 @@ public class WebController {
                                     c.role())),
                     200);
         }
+        Matcher accountStatus =
+                Pattern.compile("/api/openservice/users/([0-9a-f]{32})/status").matcher(path);
+        if (accountStatus.matches()) {
+            method(method, "PATCH");
+            c.admin();
+            c.noQuery();
+            return json(
+                    map(
+                            "result",
+                            Service.changeActive(
+                                    c.db,
+                                    c.user.get("user_id").toString(),
+                                    accountStatus.group(1),
+                                    body(c))),
+                    200);
+        }
+        Matcher accountPage = Pattern.compile("/admin/accounts/([0-9a-f]{32})").matcher(path);
+        if (accountPage.matches()) return accountDetail(c, accountPage.group(1), method);
         if (path.equals("/api/openservice/users")) {
             method(method, "POST");
             c.admin();
@@ -611,6 +631,39 @@ public class WebController {
                                         id)));
     }
 
+    private ModelAndView accountDetail(Request c, String id, String method) throws Exception {
+        method(method, "GET", "POST");
+        c.admin();
+        c.noQuery();
+        c.uniqueQuery();
+        var account = Service.account(c.db, id);
+        String error = null;
+        int status = 200;
+        if (method.equals("POST")) {
+            try {
+                String active = c.parameter("active", "");
+                if (!Set.of("true", "false").contains(active))
+                    throw new Failure(400, "Choose active or inactive");
+                Service.changeActive(
+                        c.db,
+                        c.user.get("user_id").toString(),
+                        id,
+                        map("active", Boolean.parseBoolean(active)));
+                return redirect("/admin/accounts/" + id);
+            } catch (Failure failure) {
+                error = failure.getMessage();
+                status = failure.status;
+            }
+        }
+        var result =
+                view(
+                        c,
+                        "account-detail",
+                        map("table", "accounts", "account", account, "error", error));
+        result.setStatus(HttpStatus.valueOf(status));
+        return result;
+    }
+
     private ModelAndView accounts(Request c, String method) throws Exception {
         method(method, "GET", "POST");
         c.admin();
@@ -655,8 +708,8 @@ public class WebController {
                                 "accounts",
                                 "accounts",
                                 c.db.all(
-                                        "SELECT name,role FROM os_user ORDER BY name LIMIT 25"
-                                                + " OFFSET ?",
+                                        "SELECT user_id,name,role,active FROM os_user ORDER BY name"
+                                            + " LIMIT 25 OFFSET ?",
                                         (page - 1) * 25),
                                 "total",
                                 total,

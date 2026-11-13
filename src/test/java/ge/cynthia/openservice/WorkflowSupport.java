@@ -36,6 +36,101 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void administratorsDeactivateAndReactivateWithoutRevivingSessions() throws Exception {
+        account("OffboardAgent", "agent");
+        account("OffboardReader", "reader");
+        account("OtherAdmin", "admin");
+        String id =
+                object(parsed(get("/api/openservice/me", auth("OffboardAgent"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String api = "/api/openservice/users/" + id + "/status", page = "/admin/accounts/" + id;
+        assertEquals(403, get(page, auth("OffboardAgent")).statusCode());
+        assertEquals(
+                403, json("PATCH", api, map("active", false), auth("OffboardAgent")).statusCode());
+        assertEquals(
+                403, json("PATCH", api, map("active", false), auth("OffboardReader")).statusCode());
+        login("OffboardAgent");
+        var result = json("PATCH", api, map("active", false), auth("admin"));
+        assertEquals(200, result.statusCode());
+        assertEquals(
+                Set.of("user_id", "name", "role", "active"),
+                object(parsed(result).get("result")).keySet());
+        assertEquals(false, object(parsed(result).get("result")).get("active"));
+        assertEquals(401, get("/api/openservice/me", null).statusCode());
+        assertEquals(401, get("/api/now/table/incident", auth("OffboardAgent")).statusCode());
+        String csrf = csrf(get("/login", null));
+        assertEquals(
+                401,
+                form(
+                                "/login",
+                                map(
+                                        "csrf",
+                                        csrf,
+                                        "username",
+                                        "OffboardAgent",
+                                        "password",
+                                        PASSWORD),
+                                null)
+                        .statusCode());
+        assertEquals(200, json("PATCH", api, map("active", false), auth("admin")).statusCode());
+        new Store(environment);
+        assertEquals(401, get("/api/openservice/me", auth("OffboardAgent")).statusCode());
+        assertEquals(200, json("PATCH", api, map("active", true), auth("admin")).statusCode());
+        assertEquals(401, get("/api/openservice/me", null).statusCode());
+        login("OffboardAgent");
+        assertEquals(
+                id, object(parsed(get("/api/openservice/me", null)).get("result")).get("user_id"));
+        assertEquals(200, json("PATCH", api, map("active", true), auth("admin")).statusCode());
+        for (Object bad :
+                List.of(
+                        map(),
+                        map("active", "false"),
+                        map("active", false, "role", "admin"),
+                        List.of()))
+            assertEquals(400, json("PATCH", api, bad, auth("admin")).statusCode());
+        assertEquals(
+                404,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + "f".repeat(32) + "/status",
+                                map("active", false),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(405, get(api, auth("admin")).statusCode());
+        assertEquals(400, get(page + "?other=true", auth("admin")).statusCode());
+        String other =
+                object(parsed(get("/api/openservice/me", auth("OtherAdmin"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String otherApi = "/api/openservice/users/" + other + "/status";
+        assertEquals(
+                200, json("PATCH", otherApi, map("active", false), auth("admin")).statusCode());
+        String admin =
+                object(parsed(get("/api/openservice/me", auth("admin"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        assertEquals(
+                409,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + admin + "/status",
+                                map("active", false),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                409,
+                form("/admin/accounts/" + admin, map("active", "false"), auth("admin"))
+                        .statusCode());
+        assertEquals(200, json("PATCH", otherApi, map("active", true), auth("admin")).statusCode());
+        String token = login("admin");
+        assertEquals(403, form(page, map("active", "false"), null).statusCode());
+        assertEquals(400, form(page, map("active", "invalid", "csrf", token), null).statusCode());
+        assertEquals(302, form(page, map("active", "false", "csrf", token), null).statusCode());
+        assertEquals(200, get(page, null).statusCode());
+    }
+
+    @Test
     void revocationInvalidatesAllBrowserSessionsButPreservesCredentials() throws Exception {
         account("SessionReader", "reader");
         login("SessionReader");

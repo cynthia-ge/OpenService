@@ -4,7 +4,7 @@ import java.sql.SQLException;
 
 /** Ordered, transactional upgrades. The caller commits schema and bootstrap data together. */
 final class Migrations {
-    static final int VERSION = 3;
+    static final int VERSION = 4;
 
     private Migrations() {}
 
@@ -48,6 +48,13 @@ final class Migrations {
                     "INSERT INTO os_migration(version,name) VALUES(3,?)",
                     "revocable browser sessions");
         }
+        if (version < 4) {
+            addColumn(
+                    db, "os_user", "active", "INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1))");
+            db.update(
+                    "INSERT INTO os_migration(version,name) VALUES(4,?)",
+                    "account activation state");
+        }
     }
 
     private static void addColumn(Store.Db db, String table, String column, String definition)
@@ -56,8 +63,19 @@ final class Migrations {
                 db.connection
                         .getMetaData()
                         .getColumns(null, db.connection.getSchema(), table, column)) {
-            if (!columns.next())
-                db.update("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+            if (!columns.next()) {
+                // SQLite may expose constraint validation as a result during ALTER TABLE.
+                try (var query =
+                        db.statement(
+                                "ALTER TABLE "
+                                        + table
+                                        + " ADD COLUMN "
+                                        + column
+                                        + " "
+                                        + definition)) {
+                    query.execute();
+                }
+            }
         }
     }
 }

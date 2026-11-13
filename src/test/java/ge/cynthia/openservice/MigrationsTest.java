@@ -180,6 +180,76 @@ class MigrationsTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    void concurrentDeactivationKeepsAnActiveAdministrator(boolean postgres) throws Exception {
+        var store = new Store(configuration(postgres));
+        String admin, second;
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db,
+                    Values.map(
+                            "name",
+                            "SecondAdmin",
+                            "password",
+                            "test-only-password-long",
+                            "role",
+                            "admin"));
+            admin =
+                    db.one("SELECT user_id FROM os_user WHERE name='admin'")
+                            .get("user_id")
+                            .toString();
+            second =
+                    db.one("SELECT user_id FROM os_user WHERE name='SecondAdmin'")
+                            .get("user_id")
+                            .toString();
+            db.connection.commit();
+            assertEquals(
+                    403,
+                    assertThrows(
+                                    Values.Failure.class,
+                                    () ->
+                                            Service.changeActive(
+                                                    db,
+                                                    "missing",
+                                                    second,
+                                                    Values.map("active", false)))
+                            .status);
+        }
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var start = new CountDownLatch(1);
+            List<Future<Integer>> results = new ArrayList<>();
+            for (String target : List.of(admin, second))
+                results.add(
+                        executor.submit(() -> {
+                            start.await();
+                            try (var db = store.open()) {
+                                try {
+                                    Service.changeActive(
+                                            db, admin, target, Values.map("active", false));
+                                    db.connection.commit();
+                                    return 200;
+                                } catch (Values.Failure failure) {
+                                    db.connection.rollback();
+                                    return failure.status;
+                                }
+                            }
+                        }));
+            start.countDown();
+            var statuses =
+                    List.of(
+                            results.get(0).get(30, TimeUnit.SECONDS),
+                            results.get(1).get(30, TimeUnit.SECONDS));
+            assertEquals(1, statuses.stream().filter(status -> status == 200).count());
+            assertTrue(
+                    statuses.stream().allMatch(status -> Set.of(200, 403, 409).contains(status)));
+        }
+        try (var db = store.open()) {
+            assertEquals(
+                    1, db.count("SELECT COUNT(*) FROM os_user WHERE active=1 AND role='admin'"));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void concurrentFreshStartupSerializesBootstrapAndMigration(boolean postgres) throws Exception {
         var config = configuration(postgres);
         try (var executor = Executors.newFixedThreadPool(4)) {

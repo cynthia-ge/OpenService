@@ -61,7 +61,7 @@ For a first review with colleagues, follow the [evaluation walkthrough](docs/eva
 - Incident, problem, change, request, configuration-item, knowledge and group workspaces.
 - Create/edit forms, summary search, pagination, record details and responsive navigation.
 - State transitions and administrator approval/rejection for changes, enforced in the API as well as the UI.
-- Administrator-only account creation and paginated account lists in the browser; administrator, agent and reader roles, password hashes, sessions, CSRF protection and authenticated Basic API access.
+- Administrator-only account creation and paginated account lists in the browser; administrator, agent and reader roles, stable identities, password hashes, revocable sessions, CSRF protection and authenticated Basic API access. Administrators can deactivate/reactivate accounts with last-active-administrator protection.
 - Activity notes, persistent attachments with binary/multipart upload, metadata/list/download and administrator deletion APIs, audit events and JSON export.
 - A shared schema registry used by validation, API services and generated forms.
 - A bounded Table API subset: CRUD on unversioned/v1/v2 routes, selected encoded-query operators, sorting, field projection, pagination, optional Link suppression and reads without total-count queries.
