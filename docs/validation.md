@@ -12,3 +12,7 @@
 Python line coverage does not measure CSS/template coverage. UI checks verify the rendered journeys, not pixel identity with ServiceNow. Terraform mock tests do not prove live cloud provisioning. This is not an independent ServiceNow conformance test, a load test or a penetration test.
 
 Reproduction commands are in the root README and Terraform guide. The compatibility ledger records remaining product and enterprise-operation gaps.
+
+## Count aggregation iteration
+
+The expanded suite passes **78 tests on both SQLite and PostgreSQL 17**. Measured production application plus setup-helper coverage is **508/508 lines and 176/176 branches**. The new aggregate module is **38/38 lines and 14/14 branches**. Acceptance first failed with 404 on the baseline. Tests cover empty and filtered counts, multicolumn grouping, ordering, permissions, unsupported parameters and the absence of pagination truncation. PostgreSQL verification: `docker compose --profile test build test` and `docker compose --profile test run --rm test`. Earlier browser and Terraform results above belong to the foundation iteration; this API-only iteration does not change those surfaces.

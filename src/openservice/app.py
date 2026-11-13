@@ -10,12 +10,14 @@ from sqlalchemy import select, func
 from werkzeug.exceptions import BadRequest, Forbidden, HTTPException, NotFound, Unauthorized
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
+from .aggregate import api as aggregate_api
 from .store import initialize, User, Schema, Record, Event, Attachment, serialize, audit
 from .service import schema, record, create, update, remove, page, project, migrate
 
 
 def create_app(config=None):
     app = Flask(__name__)
+    app.register_blueprint(aggregate_api)
     app.config.update(SECRET_KEY=os.environ.get("SECRET_KEY"), ADMIN_PASSWORD=os.environ.get("ADMIN_PASSWORD"),
                       DATABASE_URL=os.environ.get("DATABASE_URL", "sqlite:///openservice.db"),
                       MAX_CONTENT_LENGTH=6 * 1024 * 1024, SESSION_COOKIE_HTTPONLY=True,

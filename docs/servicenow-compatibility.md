@@ -17,7 +17,7 @@ Target: a bounded subset of the **Australia Table API documentation**, accessed 
 | OS-009 | A3 | Configuration items/knowledge/groups | Partial: real CRUD workspaces; not full CMDB/IRE, knowledge publishing or group membership. |
 | OS-010 | Platform operations | Docker and multi-cloud infrastructure | Docker verified locally; AWS/GCP/Azure validated and mock-plan tested, not deployed. |
 | OS-011 | A1/A4(c) | Business rules and Glide runtime | Missing; prioritize a sandboxed, explicitly scoped implementation with source-backed semantics. |
-| OS-012 | A4(a) | Aggregate, native attachments, Import Set and Batch APIs | Missing. |
+| OS-012 | A4(a) | Aggregate, native attachments, Import Set and Batch APIs | Partial: filtered/grouped count Aggregate API added; numeric aggregates, native attachments, Import Set and Batch remain missing. |
 | OS-013 | A1/A5 | Flow Designer, SLAs, catalog, update sets | Missing; no placeholder interfaces claim support. |
 | OS-014 | Enterprise operation | SSO, fine-grained ACLs, rate limits, workers, migrations | Missing; required before production adoption. |
 | OS-015 | Migration | Direct connector, attachments, journals, differential sync | Missing; next adoption-focused tranche. |
@@ -35,3 +35,7 @@ Target: a bounded subset of the **Australia Table API documentation**, accessed 
 - Terraform uses provider validation and mock-provider plan assertions for each target; no claim of a live cloud deployment.
 
 Reproduce results with the commands in the README. Record the final measured counts and checks in `validation.md`. Future iterations should close one ledger gap at a time unless the user expands scope again.
+
+## Count aggregation iteration — 13 November 2026
+
+[Primary Aggregate API reference](https://www.servicenow.com/docs/r/api-reference/rest-apis/c_AggregateAPI.html?contentId=z1y5kSDzdmS5hEs40YMlSQ), Australia documentation updated 2026-04-21. Implements stored-value counts over the full filtered selection, optional groupings and COUNT/field ordering. Numeric aggregate functions and display-value resolution are explicitly rejected. Baseline HEAD: `4360f0a868633f7b7dba9b3b2e415da1d5bcf4c5`.

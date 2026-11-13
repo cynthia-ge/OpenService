@@ -116,3 +116,7 @@ terraform -chdir=terraform/aws test
 Cloud configurations provide HTTPS; secure cookies are enabled outside the loopback Docker demo. Each deployment starts with a single application instance and four threads. PostgreSQL locks protect record updates; optional `If-Match` revisions prevent lost updates. Schema creation is an initial bootstrap, not an upgrade migration system. Coordinate upgrades with a database backup and downtime until versioned migrations are added.
 
 SSO, granular ACL/domain isolation, rate limiting, malware scanning, background workers, email delivery, business-rule scripts and high availability are not implemented. Treat this version as a local evaluation foundation, not a hardened production service. No licence has been selected yet; source publication or licensing is a separate decision.
+
+## Count aggregates
+
+The read-only `/api/now/stats/{table}` subset now supports filtered counts, grouping and aggregate ordering over the complete selection. See [API details](docs/api.md) and the updated [78-test validation results](docs/validation.md).
