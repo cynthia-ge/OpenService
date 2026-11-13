@@ -8,9 +8,10 @@ from urllib.parse import urlencode
 from flask import Flask, Response, g, jsonify, redirect, render_template, request, session, url_for, flash
 from sqlalchemy import select, func
 from werkzeug.exceptions import BadRequest, Forbidden, HTTPException, NotFound, Unauthorized
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
 from .aggregate import api as aggregate_api
+from .accounts import ROLES, account_page, create_account
 from .store import initialize, User, Schema, Record, Event, Attachment, serialize, audit
 from .service import schema, record, create, update, remove, page, project, migrate
 
@@ -244,17 +245,29 @@ def create_app(config=None):
     def users():
         if g.user.role != "admin":
             raise Forbidden("Only administrators can manage users")
-        payload = request.get_json()
-        if not isinstance(payload, dict) or set(payload) != {"name", "password", "role"}:
-            raise BadRequest("Provide name, password and role")
-        name, password, role = payload["name"], payload["password"], payload["role"]
-        if not isinstance(name, str) or not name.isascii() or not name.isalnum() or len(name) > 80 or not isinstance(password, str) or len(password) < 12 or role not in ["admin", "agent", "reader"]:
-            raise BadRequest("Use an alphanumeric name, a password of at least 12 characters, and admin/agent/reader role")
-        if g.db.get(User, name):
-            raise BadRequest("User already exists")
-        g.db.add(User(name=name, password=generate_password_hash(password), role=role))
+        account = create_account(g.db, request.get_json())
         g.db.commit()
-        return jsonify(result={"name": name, "role": role}), 201
+        return jsonify(result={"name": account.name, "role": account.role}), 201
+
+    @app.route("/admin/accounts", methods=["GET", "POST"])
+    def accounts():
+        if g.user.role != "admin":
+            raise Forbidden("Only administrators can manage users")
+        rows, total, number, pages = account_page(g.db, request.args)
+        error = None
+        values = {"name": "", "role": "reader"}
+        if request.method == "POST":
+            values = {"name": request.form.get("name", ""), "role": request.form.get("role", "reader")}
+            try:
+                account = create_account(g.db, {**values, "password": request.form.get("password", "")})
+            except BadRequest as exc:
+                error = exc.description
+            else:
+                g.db.commit()
+                flash(f"Account for {account.name} created. They can now sign in.")
+                return redirect(url_for("accounts", page=number))
+        return render_template("accounts.html", **context(table="accounts", accounts=rows, total=total,
+                               page=number, pages=pages, roles=ROLES, values=values, error=error)), 400 if error else 200
 
     @app.post("/api/openservice/import/<table>")
     def api_import(table):

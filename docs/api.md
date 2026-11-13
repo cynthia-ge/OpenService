@@ -10,11 +10,23 @@ Use JSON and authenticated Basic requests, or a logged-in session with `X-CSRF-T
 | `PATCH` or `PUT` at the same route | Update provided fields; optional `If-Match: "revision"` |
 | `DELETE` at the same route | Administrator-only deletion; 204; preserves deletion audit |
 | `GET /api/openservice/schema` | OpenService-owned dictionary; not the native sys_dictionary API |
-| `POST /api/openservice/users` | Admin-only creation with name, password (12+ characters) and admin/agent/reader role |
+| `POST /api/openservice/users` | Admin-only creation with name, password (12–1024 characters) and admin/agent/reader role |
 | `POST /api/openservice/import/{table}?dry_run=true` | Preview migration; `false` commits an error-free batch |
 | `GET /export/{table}` | Export current records merged with preserved source-only fields |
 | `GET /export/{table}?source=true` | Export original imported rows; native records use current values |
 | `GET /healthz` | Unauthenticated database readiness check |
+
+## Local accounts
+
+`POST /api/openservice/users` requires exactly three JSON keys: `name`, `password`, and `role`. Names contain 1–80 ASCII letters or digits and are case-sensitive; passwords contain 12–1024 characters; roles are `admin`, `agent`, or `reader`. A successful creation returns 201 with `{"result":{"name":"...","role":"..."}}`. Invalid fields or a duplicate name return 400 using the existing error envelope. Duplicate creation never changes an existing account. The 1024-character maximum is now enforced on both the API and browser form; the earlier API had no explicit maximum.
+
+The original OpenService browser workspace is `GET /admin/accounts`: administrator-only, 25 users per page ordered by stored username, with the current account identified. Only names and roles are selected for the list; password hashes are never rendered. Optional `page` defaults to `1`; only a single positive integer of up to six digits is accepted, and pages beyond the list return 400. Unknown parameters also return 400. Database collation determines name ordering.
+
+`POST /admin/accounts` accepts form fields `name`, `password`, and `role` plus the session CSRF token. The role defaults to `reader`. Success redirects (302) to the current account-list page and displays a confirmation; invalid input returns the form with an inline error (400), preserving the username/role but never the password. Both creation routes use the same validation, password hashing and persistence. Unauthenticated browser requests redirect to login; authenticated non-admins receive 403, and session writes without valid CSRF receive 403. Basic-authenticated requests retain the existing CSRF exemption.
+
+This is local account onboarding, not a ServiceNow `sys_user` API. All roles can read all workspace records. Account editing, deactivation, password reset, SSO, role inheritance and per-record/field ACLs are not implemented.
+
+## Table requests
 
 List parameters: `sysparm_query`, `sysparm_fields`, `sysparm_limit` (1–10000; default 10000), `sysparm_offset` (default 0). A single-record GET supports only `sysparm_fields`. Unsupported parameters fail rather than silently changing results.
 

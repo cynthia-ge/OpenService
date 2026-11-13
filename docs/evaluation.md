@@ -1,0 +1,38 @@
+# First evaluation
+
+Use a local disposable instance and synthetic records for this walkthrough. It exercises individual sign-in, service-desk work and read-only review. OpenService is an evaluation foundation; the [compatibility ledger](servicenow-compatibility.md) records what remains before production adoption.
+
+## Start the workspace
+
+Follow [Run locally](../README.md#run-locally), then open http://localhost:8090 and sign in as `admin` with the generated password from your private `.env`. The default listener is local to your computer. Each evaluator can run their own copy; a shared hosted instance needs separately configured access and HTTPS.
+
+## Give each person their own login
+
+1. As administrator, choose **Accounts** in the navigation.
+2. Create an account such as `EvalAgent`, choose **Agent**, and supply a unique password of 12–1024 characters. Usernames accept 1–80 letters or digits and are case-sensitive.
+3. Create `EvalReader` with **Reader**, the form's default role. Share credentials through an agreed secure channel.
+4. Confirm both names and roles appear in the list. With more than 25 accounts, use the page controls. Passwords are never displayed after submission.
+
+Administrator can also create another administrator. Duplicate names return an inline error without changing the existing account. There is no password-reset, account-edit or deactivation workflow yet, so keep this evaluation environment disposable.
+
+## Walk through service-desk work
+
+| Person | Try | Expected result |
+|---|---|---|
+| Agent, in a separate browser profile | Sign in and open Incidents; create a record with a synthetic summary | A persistent incident with its own number appears |
+| Agent | Move the incident from New to In progress, save and add an internal note | The new state and activity appear after reloading |
+| Reader, in another profile | Sign in and open the same incident | The record and activity are visible; creation/edit controls are unavailable |
+| Reader or agent | Open `/admin/accounts` directly | Access is denied; the Accounts navigation link is absent |
+| Administrator | Return to Accounts | All local accounts and their roles are visible |
+
+All three roles can read all workspace records, notes and attachments. Agent can create/update records, add notes and upload files; administrator additionally manages account creation, imports data, approves changes and deletes records. These are action permissions, not team, customer or field isolation.
+
+For a broader review, use [Migration studio](migration.md) to preview a small synthetic export before applying it, inspect the audit trail and compare the [API scope](api.md) with required integrations. Keep notes on the workflow, expected behavior, observed result and any missing capability.
+
+## Adoption questions to capture
+
+- Which service workflows, integrations and migration sources are essential?
+- What identity provider, team/customer separation and audit controls are required?
+- What availability, recovery, upgrade and performance targets would a pilot need?
+
+SSO, granular ACLs/domain isolation, password reset/deactivation, versioned schema upgrades and high availability remain missing. Existing Docker/browser tests demonstrate the documented evaluation workflows; they do not establish production readiness or complete ServiceNow compatibility.

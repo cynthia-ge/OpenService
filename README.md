@@ -25,6 +25,13 @@ Captured from the application running in local Docker with PostgreSQL and synthe
 </details>
 
 <details>
+<summary>Administrator account onboarding</summary>
+
+![Administrator account list, create-account form and role guidance](assets/screenshots/accounts.png)
+
+</details>
+
+<details>
 <summary>Mobile workspace</summary>
 
 <img src="assets/screenshots/mobile.png" alt="OpenService workspace on a narrow mobile viewport" width="390">
@@ -43,12 +50,14 @@ Open **http://localhost:8090**. Sign in as **admin**, using `ADMIN_PASSWORD` fro
 
 `docker compose down` preserves records. The named `database` volume stores records, audit events, attachment bytes and original migration payloads. Do not use `down -v` unless you intend to erase this local data. Back up PostgreSQL before upgrades.
 
+For a first review with colleagues, follow the [evaluation walkthrough](docs/evaluation.md). Administrators can now open **Accounts** to create individual agent and reader logins directly in the browser.
+
 ## What works
 
 - Incident, problem, change, request, configuration-item, knowledge and group workspaces.
 - Create/edit forms, summary search, pagination, record details and responsive navigation.
 - State transitions and administrator approval/rejection for changes, enforced in the API as well as the UI.
-- Administrator, agent and reader accounts; password hashes, sessions, CSRF protection and authenticated Basic API access.
+- Administrator-only account creation and paginated account lists in the browser; administrator, agent and reader roles, password hashes, sessions, CSRF protection and authenticated Basic API access.
 - Activity notes, persistent attachments, audit events and JSON export.
 - A shared schema registry used by validation, API services and generated forms.
 - A bounded Table API subset: CRUD, selected encoded-query operators, sorting, field projection and pagination.
@@ -105,6 +114,14 @@ cp artifacts/{workspace,record,migration,mobile}.png assets/screenshots/
 
 The journey tests login, creation, transitions, notes, a migration preview and a mobile viewport. It never contacts a ServiceNow instance.
 
+The separate account journey uses `OPEN_SERVICE_EVAL_URL` and `OPEN_SERVICE_EVAL_PASSWORD` for a disposable instance, creates two synthetic users and an incident, and captures desktop/mobile account screens:
+
+```bash
+.venv/bin/python tests/accounts_browser_journey.py
+```
+
+Set the password environment variable through a private prompt or your secret manager; do not put its value in shell history. See [validation notes](docs/validation.md) for the measured scope.
+
 ```bash
 terraform -chdir=terraform/aws init -backend=false
 terraform -chdir=terraform/aws test
@@ -119,4 +136,4 @@ SSO, granular ACL/domain isolation, rate limiting, malware scanning, background 
 
 ## Count aggregates
 
-The read-only `/api/now/stats/{table}` subset now supports filtered counts, grouping and aggregate ordering over the complete selection. Table and Aggregate APIs both support bounded `IN` and `NOT IN` membership filters. See [API details](docs/api.md) and the updated [88-test validation results](docs/validation.md).
+The read-only `/api/now/stats/{table}` subset now supports filtered counts, grouping and aggregate ordering over the complete selection. Table and Aggregate APIs both support bounded `IN` and `NOT IN` membership filters. See [API details](docs/api.md) and [validation results](docs/validation.md).
