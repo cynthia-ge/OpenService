@@ -46,6 +46,115 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void journalHistoryPagesAndDownloadsPreserveAccessAndStableBoundaries() throws Exception {
+        account("JournalDenied", "reader");
+        login("admin");
+        for (String kind : List.of("security-events", "authentication-events")) {
+            boolean authentication = kind.equals("authentication-events");
+            String table = authentication ? "os_auth_event" : "os_security_event",
+                    api = "/api/openservice/" + kind,
+                    ui = "/admin/" + kind;
+            List<String> expected;
+            try (var db = store.open()) {
+                db.update("DELETE FROM " + table);
+                String admin =
+                        db.one("SELECT user_id FROM os_user WHERE name='admin'")
+                                .get("user_id")
+                                .toString();
+                for (int i = 0; i < 205; i++) {
+                    if (authentication)
+                        AuthenticationEvents.record(
+                                db,
+                                "admin",
+                                Passwords.tokenHash("history" + i),
+                                "browser",
+                                "failed");
+                    else
+                        SecurityEvents.record(db, admin, admin, "account.fixture", map("index", i));
+                }
+                expected =
+                        db.all("SELECT event_id FROM " + table + " ORDER BY sequence DESC").stream()
+                                .map(e -> e.get("event_id").toString())
+                                .toList();
+                db.connection.commit();
+            }
+            var first = parsed(get(api, null));
+            var firstRows = objects(first.get("result"));
+            assertEquals(100, firstRows.size());
+            assertEquals(
+                    expected.subList(0, 100),
+                    firstRows.stream().map(e -> e.get("event_id").toString()).toList());
+            String before = first.get("next_before").toString();
+            assertFalse(before.isEmpty());
+            assertFalse(firstRows.getFirst().containsKey("sequence"));
+            try (var db = store.open()) {
+                String admin =
+                        db.one("SELECT user_id FROM os_user WHERE name='admin'")
+                                .get("user_id")
+                                .toString();
+                if (authentication)
+                    AuthenticationEvents.record(
+                            db, "admin", Passwords.tokenHash("newer"), "browser", "succeeded");
+                else SecurityEvents.record(db, admin, admin, "account.newer", map());
+                db.connection.commit();
+            }
+            var second = parsed(get(api + "?before=" + before, null));
+            assertEquals(
+                    expected.subList(100, 200),
+                    objects(second.get("result")).stream()
+                            .map(e -> e.get("event_id").toString())
+                            .toList());
+            var last = parsed(get(api + "?before=" + second.get("next_before"), null));
+            assertEquals(
+                    expected.subList(200, 205),
+                    objects(last.get("result")).stream()
+                            .map(e -> e.get("event_id").toString())
+                            .toList());
+            assertEquals("", last.get("next_before"));
+            assertEquals(List.of(), parsed(get(api + "?before=1", null)).get("result"));
+            var download = get(api + "?before=" + before + "&download=true", null);
+            assertEquals(second, parsed(download));
+            assertEquals(
+                    "attachment; filename=\"" + kind + ".json\"",
+                    download.headers().firstValue("Content-Disposition").orElseThrow());
+            assertTrue(
+                    download.headers()
+                            .firstValue("Content-Type")
+                            .orElseThrow()
+                            .contains("application/json"));
+            assertEquals(second, parsed(get(ui + "?before=" + before + "&download=true", null)));
+            assertEquals(200, get(ui + "?before=" + before, null).statusCode());
+            assertEquals(200, get(ui + "?download=false", null).statusCode());
+            for (String bad :
+                    List.of(
+                            "?before=",
+                            "?before=0",
+                            "?before=-1",
+                            "?before=9223372036854775808",
+                            "?before=" + "9".repeat(20),
+                            "?download=1",
+                            "?x=1",
+                            "?before=1&before=2")) {
+                assertEquals(400, get(api + bad, null).statusCode(), bad);
+                assertEquals(400, get(ui + bad, null).statusCode(), bad);
+            }
+            assertEquals(403, get(api + "?download=true", auth("JournalDenied")).statusCode());
+            try (var db = store.open()) {
+                db.update(
+                        "DELETE FROM "
+                                + table
+                                + " WHERE sequence NOT IN (SELECT sequence FROM "
+                                + table
+                                + " ORDER BY sequence DESC LIMIT 100)");
+                db.connection.commit();
+            }
+            var exact = parsed(get(api, null));
+            assertEquals(100, objects(exact.get("result")).size());
+            assertEquals("", exact.get("next_before"));
+        }
+    }
+
+    @Test
     void accountDirectorySearchFiltersAndPaginationStayRestrictedAndConsistent() throws Exception {
         String api = "/api/openservice/users";
         assertEquals(401, get(api, null).statusCode());

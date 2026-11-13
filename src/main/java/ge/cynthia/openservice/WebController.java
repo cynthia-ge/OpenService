@@ -598,24 +598,44 @@ public class WebController {
                             c.db, c.user.get("user_id").toString(), revokeInvite.group(1));
             return api ? json(map("result", result), 200) : redirect("/admin/invitations");
         }
-        if (Set.of("/admin/authentication-events", "/api/openservice/authentication-events")
+        if (Set.of(
+                        "/admin/authentication-events",
+                        "/api/openservice/authentication-events",
+                        "/admin/security-events",
+                        "/api/openservice/security-events")
                 .contains(path)) {
             method(method, "GET");
             c.admin();
-            c.noQuery();
-            var events = AuthenticationEvents.latest(c.db);
-            return path.startsWith("/api/")
-                    ? json(map("result", events), 200)
-                    : view(c, "authentication-events", map("table", "security", "events", events));
-        }
-        if (Set.of("/admin/security-events", "/api/openservice/security-events").contains(path)) {
-            method(method, "GET");
-            c.admin();
-            c.noQuery();
-            var events = SecurityEvents.latest(c.db);
-            return path.startsWith("/api/")
-                    ? json(map("result", events), 200)
-                    : view(c, "security-events", map("table", "security", "events", events));
+            boolean authentication = path.endsWith("authentication-events");
+            var journal =
+                    authentication
+                            ? AuthenticationEvents.page(c.db, queryArguments(c))
+                            : SecurityEvents.page(c.db, queryArguments(c));
+            boolean download = (Boolean) journal.get("download");
+            if (download)
+                disposition(
+                        c, authentication ? "authentication-events.json" : "security-events.json");
+            if (path.startsWith("/api/") || download)
+                return json(
+                        map(
+                                "result",
+                                journal.get("result"),
+                                "next_before",
+                                journal.get("next_before")),
+                        200);
+            String before = journal.get("before").toString();
+            return view(
+                    c,
+                    authentication ? "authentication-events" : "security-events",
+                    map(
+                            "table",
+                            "security",
+                            "events",
+                            journal.get("result"),
+                            "nextBefore",
+                            journal.get("next_before"),
+                            "downloadQuery",
+                            before.isEmpty() ? "download=true" : "download=true&before=" + before));
         }
         Matcher recoveryIssue =
                 Pattern.compile("/api/openservice/users/([0-9a-f]{32})/recovery").matcher(path);

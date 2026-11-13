@@ -31,9 +31,11 @@ final class AuthenticationEvents {
                         + " BY sequence DESC LIMIT 1 OFFSET 9999)");
     }
 
-    static List<Map<String, Object>> latest(Store.Db db) throws SQLException {
-        return db.all(
-                "SELECT event_id,occurred_at,user_id,user_name,identity_hash,mechanism,outcome FROM"
-                        + " os_auth_event ORDER BY sequence DESC LIMIT 100");
+    static Map<String, Object> page(Store.Db db, Map<String, String> args) throws SQLException {
+        return EventJournal.page(
+                db,
+                "os_auth_event",
+                "event_id,occurred_at,user_id,user_name,identity_hash,mechanism,outcome",
+                args);
     }
 }

@@ -142,3 +142,5 @@ Cycle 14 / ADOPT-08: persistent shared browser/Basic password-attempt limits now
 Cycle 15 / ADOPT-09: administrator authentication-event UI/API now records durable, sanitized browser/Basic success, failure and throttling with rolling retention. Complete authorization/session monitoring, archive/export, SIEM delivery and organization-approved retention remain open. M1 remains unmet.
 
 Cycle 16 / ADOPT-03/05: administrators can find accounts by literal username, role and status through matching UI/API pagination. Profiles/email verification, complete offboarding, enterprise identity and verified delivery remain open; M1 remains unmet.
+
+Cycle 17 / ADOPT-09: both journals now have bounded cursor pagination and administrator-only selected-page JSON downloads. The former latest-100 visibility limitation is removed for retained entries. Tamper protection, external collection/alerting and enterprise retention remain open; M1 remains unmet.

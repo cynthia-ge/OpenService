@@ -3,7 +3,6 @@ package ge.cynthia.openservice;
 import static ge.cynthia.openservice.Values.*;
 
 import java.sql.SQLException;
-import java.util.List;
 import java.util.Map;
 
 /** Account lifecycle evidence. Only trusted callers supply event types and sanitized details. */
@@ -29,10 +28,11 @@ final class SecurityEvents {
                 JSON.writeValueAsString(detail));
     }
 
-    static List<Map<String, Object>> latest(Store.Db db) throws SQLException {
-        return db.all(
-                "SELECT"
-                    + " event_id,occurred_at,actor_id,actor_name,target_id,target_name,action,detail"
-                    + " FROM os_security_event ORDER BY sequence DESC LIMIT 100");
+    static Map<String, Object> page(Store.Db db, Map<String, String> args) throws SQLException {
+        return EventJournal.page(
+                db,
+                "os_security_event",
+                "event_id,occurred_at,actor_id,actor_name,target_id,target_name,action,detail",
+                args);
     }
 }

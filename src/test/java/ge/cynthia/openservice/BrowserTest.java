@@ -48,6 +48,70 @@ class BrowserTest {
     }
 
     @Test
+    void administratorBrowsesAndDownloadsOlderJournalPages() throws Exception {
+        try (var db = store.open()) {
+            String admin =
+                    db.one("SELECT user_id FROM os_user WHERE name='admin'")
+                            .get("user_id")
+                            .toString();
+            for (int i = 0; i < 105; i++) {
+                SecurityEvents.record(
+                        db,
+                        admin,
+                        admin,
+                        "account.browser_history",
+                        map("marker", String.format(Locale.ROOT, "history%03d", i)));
+                AuthenticationEvents.record(
+                        db,
+                        "admin",
+                        Passwords.tokenHash(String.format(Locale.ROOT, "history%03d", i)),
+                        "browser",
+                        "failed");
+            }
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var context = browser.newContext()) {
+            var page = context.newPage();
+            login(page, "admin");
+            for (String kind : List.of("security-events", "authentication-events")) {
+                page.navigate(base() + "/admin/" + kind);
+                page.getByRole(
+                                AriaRole.LINK,
+                                new Page.GetByRoleOptions().setName("Older events").setExact(true))
+                        .click();
+                var download =
+                        page.waitForDownload(() ->
+                                page.getByRole(
+                                                AriaRole.LINK,
+                                                new Page.GetByRoleOptions()
+                                                        .setName("Download this page"))
+                                        .click());
+                assertEquals(kind + ".json", download.suggestedFilename());
+                String content = Files.readString(download.path());
+                assertTrue(
+                        content.contains(
+                                kind.equals("security-events")
+                                        ? "history000"
+                                        : Passwords.tokenHash("history000")));
+                assertFalse(
+                        content.contains(
+                                kind.equals("security-events")
+                                        ? "history104"
+                                        : Passwords.tokenHash("history104")));
+                assertTrue(
+                        objects(object(JSON.readValue(content, Object.class)).get("result")).size()
+                                <= 100);
+                page.setViewportSize(390, 844);
+                assertTrue(
+                        (Boolean)
+                                page.evaluate("document.documentElement.scrollWidth<=innerWidth"));
+            }
+        }
+    }
+
+    @Test
     void administratorSearchesAccountsAndKeepsFiltersWhilePaging() throws Exception {
         String prefix = "FindBrowser" + id().substring(0, 8);
         try (var db = store.open()) {

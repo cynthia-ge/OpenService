@@ -185,3 +185,7 @@ Implemented local ADOPT-09 slice: durable password-verification outcomes, admini
 ## OS-041 — Searchable account administration
 
 Implemented local ADOPT-03/05 slice: administrator username/role/state filters, matching counts, paginated UI/API and sanitized output. It does not reproduce vendor encoded queries or delegated user administration. See [cycle 16](platform-foundations.md) for acceptance and exact counters.
+
+## OS-042 — Journal history navigation and export
+
+Implemented local ADOPT-09 slice: bounded cursor pages, Older/Latest browser navigation and permission-checked selected-page JSON downloads for account and authentication journals. It is not native sys_audit or Log Export Service parity. See [cycle 17](platform-foundations.md) for exact evidence.
