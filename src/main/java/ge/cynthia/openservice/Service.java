@@ -337,7 +337,8 @@ public final class Service {
             long total,
             int limit,
             int offset,
-            boolean suppressPagination) {}
+            boolean suppressPagination,
+            boolean hasNext) {}
 
     public static Page page(Store.Db db, String table, Map<String, String> args, String search)
             throws SQLException {
@@ -346,33 +347,39 @@ public final class Service {
                         "sysparm_limit",
                         "sysparm_offset",
                         "sysparm_fields",
-                        "sysparm_suppress_pagination_header")
+                        "sysparm_suppress_pagination_header",
+                        "sysparm_no_count")
                 .containsAll(args.keySet())) throw new Failure(400, "Unsupported query parameter");
         int limit = number(args.getOrDefault("sysparm_limit", "10000"), 1, 10000),
                 offset = number(args.getOrDefault("sysparm_offset", "0"), 0, Integer.MAX_VALUE);
-        boolean suppressPagination = flag(args, "sysparm_suppress_pagination_header");
+        boolean suppressPagination = flag(args, "sysparm_suppress_pagination_header"),
+                noCount = flag(args, "sysparm_no_count");
         var query = selection(db, table, args.getOrDefault("sysparm_query", ""), search);
         long total =
-                db.count(
-                        "SELECT COUNT(*) FROM os_record WHERE " + query.where,
-                        query.values.toArray());
+                noCount
+                        ? -1
+                        : db.count(
+                                "SELECT COUNT(*) FROM os_record WHERE " + query.where,
+                                query.values.toArray());
         var parameters = new ArrayList<>(query.values);
-        parameters.add(limit);
+        parameters.add(noCount ? limit + 1 : limit);
         parameters.add(offset);
+        var selected =
+                db.all(
+                        "SELECT * FROM os_record WHERE "
+                                + query.where
+                                + " ORDER BY "
+                                + query.ordering
+                                + " LIMIT ? OFFSET ?",
+                        parameters.toArray());
+        boolean hasNext = noCount ? selected.size() > limit : (long) offset + limit < total;
         var rows =
-                db
-                        .all(
-                                "SELECT * FROM os_record WHERE "
-                                        + query.where
-                                        + " ORDER BY "
-                                        + query.ordering
-                                        + " LIMIT ? OFFSET ?",
-                                parameters.toArray())
-                        .stream()
+                selected.stream()
+                        .limit(limit)
                         .map(Service::serialize)
                         .map(row -> project(row, args.getOrDefault("sysparm_fields", "")))
                         .toList();
-        return new Page(rows, total, limit, offset, suppressPagination);
+        return new Page(rows, total, limit, offset, suppressPagination, hasNext);
     }
 
     public static boolean flag(Map<String, String> args, String name) {

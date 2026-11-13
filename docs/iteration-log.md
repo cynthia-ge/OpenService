@@ -127,3 +127,15 @@ QA round 1: reviewed validation before querying, Page propagation into the HTTP 
 Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 272 tests pass, no skipped tests. Exact feature gate: `Service.java`: 357/357 lines, 216/216 branches, 27/27 methods; `WebController.java`: 613/613 lines, 310/310 branches, 37/37 methods. Whole Java application: 1134/1134 lines, 622/622 branch outcomes, 90/90 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Service.java`, `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
 
 This flag suppresses links only; avoiding the count query is a separate candidate. Existing local pagination/error semantics and bounded Table subset remain in force. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.
+
+## Cycle 9: OS-024 — Table reads without a total-count query
+
+Fixed QA base: `098b86809f063605e7c7b3b14a1685e8f129e5ed`; branch `main`, clean starting tree. Blueprint A4(a). Australia Table API sysparm_no_count defaults false; true avoids the SELECT COUNT(*) query. The new HTTP regression failed with unsupported-parameter 400 before implementation. OpenService uses a bounded extra row for next-page detection and omits unknown total/last-page metadata.
+
+SQLite/PostgreSQL tests inspect prepared statements on real JDBC connections: no-count executes the selection without COUNT, while false executes COUNT and returns the total. HTTP cases cover unversioned/v1/v2 paging, first/previous/next links, following next URLs, no last/total headers, projection, exact page size, final/empty/out-of-range pages, suppression composition, false/default behavior and invalid/repeated/resource-only parameters.
+
+QA round 1: reviewed SQL control flow, limit-plus-one bound, trimming before serialization, long offset arithmetic, total sentinel isolation, next/last relation logic, normal-count/UI compatibility, tests and docs. No new/reopened findings or repairs; all required checks pass. Unresolved: none.
+
+Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 276 tests pass, no skipped tests. Exact feature gate: `Service.java`: 362/362 lines, 226/226 branches, 27/27 methods; `WebController.java`: 614/614 lines, 314/314 branches, 37/37 methods. Whole Java application: 1140/1140 lines, 636/636 branch outcomes, 90/90 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Service.java`, `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
+
+First/previous/next without last is an explicit local policy when totals are unknown. Count omission does not remove filtering or large-offset costs. Other Table API limitations remain unchanged. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.

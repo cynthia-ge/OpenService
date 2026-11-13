@@ -1363,4 +1363,119 @@ abstract class WorkflowSupport {
                                 auth("admin"))
                         .statusCode());
     }
+
+    @Test
+    void noCountPaginationUsesLookaheadWithoutInventingTotals() throws Exception {
+        var ids =
+                List.of(
+                        add("incident").get("sys_id"),
+                        add("incident").get("sys_id"),
+                        add("incident").get("sys_id"));
+        for (String prefix :
+                List.of("/api/now/table/", "/api/now/v1/table/", "/api/now/v2/table/")) {
+            for (int offset = 0; offset < 3; offset++) {
+                String path =
+                        prefix
+                                + "incident?sysparm_no_count=true&sysparm_limit=1&sysparm_offset="
+                                + offset
+                                + "&sysparm_fields=sys_id";
+                var response = get(path, auth("admin"));
+                assertEquals(200, response.statusCode(), html(response));
+                assertEquals(
+                        List.of(map("sys_id", ids.get(offset))), parsed(response).get("result"));
+                assertTrue(response.headers().firstValue("X-Total-Count").isEmpty());
+                String link = response.headers().firstValue("Link").orElseThrow();
+                assertFalse(link.contains("rel=\"last\""));
+                assertEquals(offset < 2, link.contains("rel=\"next\""));
+                assertEquals(offset > 0, link.contains("rel=\"prev\""));
+                if (offset < 2) {
+                    var next = Pattern.compile("<([^>]+)>; rel=\"next\"").matcher(link);
+                    assertTrue(next.find());
+                    URI uri = URI.create(next.group(1));
+                    assertTrue(uri.getQuery().contains("sysparm_no_count=true"));
+                    assertEquals(
+                            List.of(map("sys_id", ids.get(offset + 1))),
+                            parsed(get(uri.getPath() + "?" + uri.getRawQuery(), auth("admin")))
+                                    .get("result"));
+                }
+            }
+        }
+        var normal =
+                get(
+                        "/api/now/table/incident?sysparm_no_count=false&sysparm_limit=1",
+                        auth("admin"));
+        assertEquals("3", normal.headers().firstValue("X-Total-Count").orElseThrow());
+        assertTrue(normal.headers().firstValue("Link").orElseThrow().contains("rel=\"last\""));
+        var suppressed =
+                get(
+                        "/api/now/table/incident?sysparm_no_count=true&sysparm_suppress_pagination_header=true",
+                        auth("admin"));
+        assertEquals(3, objects(parsed(suppressed).get("result")).size());
+        assertTrue(suppressed.headers().firstValue("Link").isEmpty());
+        assertTrue(suppressed.headers().firstValue("X-Total-Count").isEmpty());
+        for (String suffix :
+                List.of("&sysparm_query=sys_id%3Dmissing", "&sysparm_offset=2147483647")) {
+            var empty =
+                    get("/api/now/table/incident?sysparm_no_count=true" + suffix, auth("admin"));
+            assertEquals(200, empty.statusCode());
+            assertEquals(List.of(), parsed(empty).get("result"));
+            assertFalse(empty.headers().firstValue("Link").orElseThrow().contains("rel=\"next\""));
+        }
+        for (String invalid : List.of("", "True", "1", "false%20"))
+            assertEquals(
+                    400,
+                    get("/api/now/table/incident?sysparm_no_count=" + invalid, auth("admin"))
+                            .statusCode());
+        assertEquals(
+                400,
+                get(
+                                "/api/now/table/incident?sysparm_no_count=true&sysparm_no_count=false",
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                400,
+                get(
+                                "/api/now/table/incident/" + ids.get(0) + "?sysparm_no_count=true",
+                                auth("admin"))
+                        .statusCode());
+    }
+
+    List<String> issuedSql(java.sql.Connection connection) {
+        return org.mockito.Mockito.mockingDetails(connection).getInvocations().stream()
+                .filter(call -> call.getMethod().getName().equals("prepareStatement"))
+                .map(call -> call.getArgument(0).toString())
+                .toList();
+    }
+
+    @Test
+    void noCountActuallySkipsSqlCountOnTheRealDatabase() throws Exception {
+        add("incident");
+        add("incident");
+        try (var db = store.open()) {
+            var connection = org.mockito.Mockito.spy(db.connection);
+            var tracked = new Store.Db(connection, db.postgres);
+            var page =
+                    Service.page(
+                            tracked,
+                            "incident",
+                            Map.of("sysparm_no_count", "true", "sysparm_limit", "1"),
+                            "");
+            assertEquals(1, page.rows().size());
+            assertEquals(-1, page.total());
+            assertTrue(
+                    issuedSql(connection).stream()
+                            .anyMatch(sql -> sql.startsWith("SELECT * FROM os_record")));
+            assertFalse(
+                    issuedSql(connection).stream()
+                            .anyMatch(sql -> sql.toUpperCase(Locale.ROOT).contains("COUNT(")));
+            org.mockito.Mockito.clearInvocations(connection);
+            assertEquals(
+                    2,
+                    Service.page(tracked, "incident", Map.of("sysparm_no_count", "false"), "")
+                            .total());
+            assertTrue(
+                    issuedSql(connection).stream()
+                            .anyMatch(sql -> sql.toUpperCase(Locale.ROOT).contains("COUNT(")));
+        }
+    }
 }

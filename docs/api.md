@@ -28,7 +28,7 @@ This is local account onboarding, not a ServiceNow `sys_user` API. All roles can
 
 ## Table requests
 
-List parameters: `sysparm_query`, `sysparm_fields`, `sysparm_limit` (1–10000; default 10000), `sysparm_offset` (default 0), `sysparm_suppress_pagination_header` (true/false; default false). A single-record GET supports only `sysparm_fields`. Unsupported parameters fail rather than silently changing results.
+List parameters: `sysparm_query`, `sysparm_fields`, `sysparm_limit` (1–10000; default 10000), `sysparm_offset` (default 0), `sysparm_suppress_pagination_header` and `sysparm_no_count` (true/false; default false). A single-record GET supports only `sysparm_fields`. Unsupported parameters fail rather than silently changing results.
 
 The query subset supports `field=value`, `field!=value`, string `LIKE`, `STARTSWITH`, `^` conjunction, `ORDERBYfield` and `ORDERBYDESCfield`. This is not the full encoded-query grammar. No OR/NQ, dot-walking, dynamic filters, JavaScript, ACL-dependent counts or reference display modes. Sorting and filtering execute in the database. SQLite and PostgreSQL may differ in text collation.
 
@@ -84,3 +84,7 @@ Table and count Aggregate APIs accept `fieldISEMPTY` and `fieldISNOTEMPTY`, with
 ## Pagination-header suppression
 
 For Table collection reads, `sysparm_suppress_pagination_header=true` omits the Link header. It preserves records, filtering, projection, pagination and X-Total-Count. Omitted or explicit false retains the existing links; generated links preserve the false flag. Only literal lowercase true/false is accepted; invalid/repeated values return 400. The flag applies to unversioned/v1/v2 collection routes, including empty v2/unversioned results, and is not supported on individual-record reads.
+
+## Collection reads without a total-count query
+
+`sysparm_no_count=true` skips SQL COUNT(*) and omits X-Total-Count. The query reads at most limit+1 rows, returns at most limit, and uses the extra row to decide whether to emit a next-page link. As a local pagination policy, first/previous/next links are available when applicable and the last link is omitted because the total is unknown. Links retain no_count and other query parameters. Combining it with pagination-header suppression omits both headers. Omitted/false preserves normal counting and links. Strict boolean validation and existing filters/projection/limits/versioned empty-result rules still apply; the flag is collection-only. This removes the count query, not the cost of large offsets or filtering.

@@ -262,23 +262,20 @@ public class WebController {
             var page = Service.page(c.db, table, c.arguments(), "");
             if (path.startsWith("/api/now/v1/") && page.rows().isEmpty())
                 throw new Failure(404, "No records found");
-            c.response.setHeader("X-Total-Count", String.valueOf(page.total()));
+            if (page.total() >= 0)
+                c.response.setHeader("X-Total-Count", String.valueOf(page.total()));
             if (!page.suppressPagination()) {
                 var links = new ArrayList<String>();
-                var positions =
-                        map(
-                                "first",
-                                0,
-                                "last",
-                                Math.max(0, (page.total() - 1) / page.limit() * page.limit()),
-                                "prev",
-                                (long) page.offset() - page.limit(),
-                                "next",
-                                (long) page.offset() + page.limit());
+                var positions = map("first", 0);
+                if (page.total() >= 0)
+                    positions.put(
+                            "last", Math.max(0, (page.total() - 1) / page.limit() * page.limit()));
+                positions.put("prev", (long) page.offset() - page.limit());
+                positions.put("next", (long) page.offset() + page.limit());
                 for (var entry : positions.entrySet()) {
                     long index = ((Number) entry.getValue()).longValue();
                     if (entry.getKey().equals("prev") && index < 0
-                            || entry.getKey().equals("next") && index >= page.total()) continue;
+                            || entry.getKey().equals("next") && !page.hasNext()) continue;
                     var args = new LinkedHashMap<>(c.arguments());
                     args.put("sysparm_limit", String.valueOf(page.limit()));
                     args.put("sysparm_offset", String.valueOf(index));
