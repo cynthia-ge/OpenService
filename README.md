@@ -2,6 +2,35 @@
 
 A service operations foundation for Cynthia: clear workspaces, shared records, controlled workflows and a practical path from ServiceNow exports.
 
+## Screenshots
+
+Captured from the application running in local Docker with PostgreSQL and synthetic demonstration data. These are working screens, not design mockups.
+
+### Workspace overview
+
+![OpenService workspace with incident records, service metrics and migration access](assets/screenshots/workspace.png)
+
+<details>
+<summary>Record details and activity history</summary>
+
+![Incident form with state transitions, activity notes and attachments](assets/screenshots/record.png)
+
+</details>
+
+<details>
+<summary>Migration studio and dry-run report</summary>
+
+![Migration studio showing a file-import workflow and a successful dry-run report](assets/screenshots/migration.png)
+
+</details>
+
+<details>
+<summary>Mobile workspace</summary>
+
+<img src="assets/screenshots/mobile.png" alt="OpenService workspace on a narrow mobile viewport" width="390">
+
+</details>
+
 ## Run locally
 
 Requires Docker Compose and Python 3.12+ for the credential setup helper.
@@ -68,7 +97,13 @@ Browser journey (creates clearly synthetic sample records through the actual mig
 .venv/bin/python tests/browser_journey.py
 ```
 
-Screenshots are written to ignored `artifacts/`. The journey tests login, creation, transitions, notes, a migration preview and a mobile viewport. It never contacts a ServiceNow instance.
+The journey writes fresh screenshots to ignored `artifacts/`; reviewed documentation copies are versioned in `assets/screenshots/` and embedded above. Refresh those copies after visually checking the new captures:
+
+```bash
+cp artifacts/{workspace,record,migration,mobile}.png assets/screenshots/
+```
+
+The journey tests login, creation, transitions, notes, a migration preview and a mobile viewport. It never contacts a ServiceNow instance.
 
 ```bash
 terraform -chdir=terraform/aws init -backend=false
