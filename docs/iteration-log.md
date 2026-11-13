@@ -31,3 +31,15 @@ These are bounded planned slices, not claims of completed capabilities. Each ite
 | 10 | OS-025 | Attachment metadata ordering before pagination | Australia Attachment API encoded ordering |
 
 Primary sources, retrieved 13 November 2026 from the Australia release branch: [Attachment API](https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/api-reference/rest-apis/c_AttachmentAPI.md), [Table API](https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/api-reference/rest-apis/c_TableAPI.md), [encoded-query operators](https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/platform-user-interface/r_OpAvailableFiltersQueries.md). Tests are original local acceptance tests, not licensed-instance conformance captures. Broader SSO/ACLs, schema migration management, native scripting and numeric aggregates remain separate candidates.
+
+## Cycle 1: OS-016 — Binary attachment upload
+
+Fixed QA base: `1475a4ae649fca7ea474180d86c9802ae5f19218`; branch `main`, clean starting tree. Blueprint A1/A4(a). Australia Attachment API POST /file (primary source linked above): required parent/filename query fields, raw file body, 201 metadata and Location. This route was previously GET-only and the new positive HTTP regression failed with 405 before implementation.
+
+Acceptance passed on SQLite and PostgreSQL: agent/admin uploads, reader/anonymous rejection, session CSRF, exact binary/media-type round-trip, empty and 5 MiB files, oversized rejection, invalid/repeated/unknown/blank parameters, missing/wrong-table parents, safe filenames, atomic validation, unchanged parent revisions, audit events, and additive legacy-schema upgrade preserving bytes. Form-encoded bytes remain opaque; multipart forms are explicitly rejected on the raw endpoint.
+
+QA round 1: two confirmed issues fixed: download Content-Type gained an unwanted charset, and servlet form parameter parsing could consume raw form-encoded bytes. Round 2: a real multipart-to-raw regression returned 201 instead of 415; fixed explicit rejection to prevent silently consuming the body. Round 3: complete accumulated diff review found no new/reopened defects, made no repairs, and all required checks pass. Unresolved findings: none.
+
+Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 256 tests pass, no skipped tests. Exact feature gate: `Store.java`: 89/89 lines, 52/52 branches, 10/10 methods; `WebController.java`: 578/578 lines, 286/286 branches, 36/36 methods. Whole Java application: 1081/1081 lines, 586/586 branch outcomes, 88/88 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/Store.java`, `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
+
+No multipart upload, attachment updates, antivirus or granular record ACL parity is claimed in this slice. Schema upgrade requires one application instance; legacy/browser uploads retain the octet-stream default. Remaining candidates: see the sequence above; only this slice is implemented in this cycle.

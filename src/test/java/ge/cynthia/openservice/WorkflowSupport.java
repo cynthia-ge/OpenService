@@ -558,4 +558,161 @@ abstract class WorkflowSupport {
                 map("result", map("stats", map("count", "10001"))),
                 parsed(get("/api/now/stats/incident?sysparm_count=true", auth("admin"))));
     }
+
+    String binaryPath(Object id, String name) {
+        return "/api/now/attachment/file?table_name=incident&table_sys_id="
+                + id
+                + "&file_name="
+                + java.net.URLEncoder.encode(name, StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void binaryAttachmentUploadPersistsBytesAndMetadata() throws Exception {
+        account("agent", "agent");
+        account("reader", "reader");
+        String id = add("incident").get("sys_id").toString();
+        byte[] bytes = {0, 1, (byte) 255, 3};
+        String path = binaryPath(id, "../résumé.bin");
+        var response = request("POST", path, bytes, "application/x-evidence", auth("agent"));
+        assertEquals(201, response.statusCode(), html(response));
+        var file = object(parsed(response).get("result"));
+        assertEquals("resume.bin", file.get("file_name"));
+        assertEquals("4", file.get("size_bytes"));
+        assertEquals("application/x-evidence", file.get("content_type"));
+        String location = response.headers().firstValue("Location").orElseThrow();
+        assertEquals(base() + "/api/now/attachment/" + file.get("sys_id"), location);
+        assertEquals(
+                file, parsed(get(URI.create(location).getPath(), auth("reader"))).get("result"));
+        for (String download :
+                List.of(location + "/file", base() + "/attachment/" + file.get("sys_id"))) {
+            var body = get(URI.create(download).getPath(), auth("reader"));
+            assertArrayEquals(bytes, body.body());
+            assertEquals(
+                    "application/x-evidence",
+                    body.headers().firstValue("Content-Type").orElseThrow());
+        }
+        assertEquals(
+                201,
+                request(
+                                "POST",
+                                binaryPath(id, "empty.bin"),
+                                new byte[0],
+                                "application/octet-stream",
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                201,
+                request(
+                                "POST",
+                                binaryPath(id, "limit.bin"),
+                                new byte[5 * 1024 * 1024],
+                                "application/octet-stream",
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                413,
+                request(
+                                "POST",
+                                binaryPath(id, "too-large.bin"),
+                                new byte[5 * 1024 * 1024 + 1],
+                                "application/octet-stream",
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                403,
+                request("POST", path, bytes, "application/octet-stream", auth("reader"))
+                        .statusCode());
+        assertEquals(
+                401, request("POST", path, bytes, "application/octet-stream", null).statusCode());
+        login("admin");
+        assertEquals(
+                403, request("POST", path, bytes, "application/octet-stream", null).statusCode());
+        try (var db = store.open()) {
+            assertEquals(3, db.count("SELECT COUNT(*) FROM os_attachment"));
+            assertEquals(3, db.count("SELECT COUNT(*) FROM os_event WHERE action='attachment'"));
+            assertEquals(
+                    "0",
+                    Service.serialize(Service.record(db, "incident", id)).get("sys_mod_count"));
+        }
+    }
+
+    @Test
+    void binaryAttachmentValidationIsAtomic() throws Exception {
+        String id = add("incident").get("sys_id").toString();
+        String path = binaryPath(id, "evidence.txt");
+        for (String bad :
+                List.of(
+                        "/api/now/attachment/file",
+                        path + "&extra=x",
+                        path + "&file_name=duplicate",
+                        path.replace("file_name=evidence.txt", "file_name="),
+                        path.replace("table_name=incident", "table_name="),
+                        path.replace("table_sys_id=" + id, "table_sys_id=")))
+            assertEquals(
+                    400,
+                    request("POST", bad, new byte[] {1}, "text/plain", auth("admin")).statusCode(),
+                    bad);
+        for (String bad :
+                List.of(
+                        path.replace("table_name=incident", "table_name=missing"),
+                        binaryPath("missing", "evidence.txt"),
+                        path.replace("table_name=incident", "table_name=problem")))
+            assertEquals(
+                    404,
+                    request("POST", bad, new byte[] {1}, "text/plain", auth("admin")).statusCode());
+        for (String type : Arrays.asList(null, "bad", "*/*", "text/" + "a".repeat(256)))
+            assertEquals(
+                    415,
+                    request("POST", path, new byte[] {1}, type, auth("admin")).statusCode(),
+                    type);
+        assertEquals(
+                415, upload(path, "multipart.txt", new byte[] {1}, auth("admin")).statusCode());
+        assertEquals(405, get(path, auth("admin")).statusCode());
+        try (var db = store.open()) {
+            assertEquals(0, db.count("SELECT COUNT(*) FROM os_attachment"));
+            assertEquals(0, db.count("SELECT COUNT(*) FROM os_event WHERE action='attachment'"));
+        }
+    }
+
+    @Test
+    void attachmentSchemaUpgradePreservesLegacyBytes() throws Exception {
+        String parent = add("incident").get("sys_id").toString();
+        try (var db = store.open()) {
+            db.update("ALTER TABLE os_attachment DROP COLUMN content_type");
+            db.update(
+                    "INSERT INTO os_attachment(sys_id,record_id,name,content) VALUES(?,?,?,?)",
+                    "legacy-attachment",
+                    parent,
+                    "legacy.txt",
+                    new byte[] {1, 2, 3});
+            db.connection.commit();
+        }
+        new Store(environment);
+        new Store(environment);
+        var response = get("/api/now/attachment/legacy-attachment/file", auth("admin"));
+        assertEquals(200, response.statusCode());
+        assertArrayEquals(new byte[] {1, 2, 3}, response.body());
+        assertEquals(
+                "application/octet-stream",
+                response.headers().firstValue("Content-Type").orElseThrow());
+    }
+
+    @Test
+    void binaryUploadKeepsFormEncodedBytesAndAcceptsSessionCsrfHeader() throws Exception {
+        String id = add("incident").get("sys_id").toString();
+        byte[] bytes = "literal=value&second=two+words".getBytes(StandardCharsets.UTF_8);
+        String token = login("admin");
+        var response =
+                client.send(
+                        HttpRequest.newBuilder(URI.create(base() + binaryPath(id, "encoded.txt")))
+                                .header("Content-Type", "application/x-www-form-urlencoded")
+                                .header("X-CSRF-Token", token)
+                                .POST(HttpRequest.BodyPublishers.ofByteArray(bytes))
+                                .build(),
+                        HttpResponse.BodyHandlers.ofByteArray());
+        assertEquals(201, response.statusCode(), html(response));
+        var file = object(parsed(response).get("result"));
+        assertArrayEquals(
+                bytes, get("/api/now/attachment/" + file.get("sys_id") + "/file", null).body());
+    }
 }

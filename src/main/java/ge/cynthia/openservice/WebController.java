@@ -47,10 +47,14 @@ public class WebController {
         }
 
         String parameter(String key, String fallback) {
+            if (http.getRequestURI().equals("/api/now/attachment/file"))
+                return queryArguments(this).getOrDefault(key, fallback);
             return Objects.toString(http.getParameter(key), fallback);
         }
 
         Map<String, String> arguments() {
+            if (http.getRequestURI().equals("/api/now/attachment/file"))
+                return queryArguments(this);
             var values = new LinkedHashMap<String, String>();
             http.getParameterMap().forEach((key, value) -> values.put(key, value[0]));
             return values;
@@ -67,6 +71,10 @@ public class WebController {
         }
 
         void uniqueQuery() {
+            if (http.getRequestURI().equals("/api/now/attachment/file")) {
+                queryArguments(this);
+                return;
+            }
             if (http.getParameterMap().values().stream().anyMatch(v -> v.length != 1))
                 throw new Failure(400, "Repeated query parameter");
         }
@@ -415,7 +423,7 @@ public class WebController {
             var file = c.db.one("SELECT * FROM os_attachment WHERE sys_id=?", download.group(1));
             if (file == null) throw new Failure(404, "Attachment not found");
             disposition(c, (String) file.get("name"));
-            return binary((byte[]) file.get("content"), "application/octet-stream", 200);
+            return binary((byte[]) file.get("content"), (String) file.get("content_type"), 200);
         }
         if (path.equals("/migration")) return migration(c, method);
         Matcher export = Pattern.compile("/export/([^/]+)").matcher(path);
@@ -679,10 +687,62 @@ public class WebController {
     }
 
     private ModelAndView attachments(Request c, String path, String method) throws Exception {
+        if (path.equals("/api/now/attachment/file")) {
+            method(method, "POST");
+            if (c.http instanceof MultipartHttpServletRequest)
+                throw new Failure(415, "Send raw file bytes to this endpoint");
+            if (!Set.of("table_name", "table_sys_id", "file_name").equals(c.arguments().keySet()))
+                throw new Failure(400, "Supply table_name, table_sys_id and file_name only");
+            for (String value : c.arguments().values())
+                if (value.isBlank())
+                    throw new Failure(400, "Attachment parameters must not be blank");
+            String type = c.http.getContentType();
+            try {
+                if (type == null
+                        || type.length() > 255
+                        || !org.springframework.http.MediaType.parseMediaType(type).isConcrete())
+                    throw new IllegalArgumentException();
+            } catch (IllegalArgumentException error) {
+                throw new Failure(
+                        415, "A concrete Content-Type of at most 255 characters is required");
+            }
+            var item =
+                    Service.record(
+                            c.db, c.parameter("table_name", ""), c.parameter("table_sys_id", ""));
+            byte[] bytes = c.http.getInputStream().readNBytes(5 * 1024 * 1024 + 1);
+            if (bytes.length > 5 * 1024 * 1024)
+                throw new Failure(413, "Attachments are limited to 5 MB");
+            String name = filename(c.parameter("file_name", "")), id = id();
+            c.db.update(
+                    "INSERT INTO os_attachment(sys_id,record_id,name,content,content_type)"
+                            + " VALUES(?,?,?,?,?)",
+                    id,
+                    item.get("sys_id"),
+                    name,
+                    bytes,
+                    type);
+            Service.audit(c.db, item, c.name(), "attachment", map("name", name));
+            var row =
+                    map(
+                            "sys_id",
+                            id,
+                            "file_name",
+                            name,
+                            "table_sys_id",
+                            item.get("sys_id"),
+                            "table_name",
+                            item.get("table"),
+                            "size_bytes",
+                            bytes.length,
+                            "content_type",
+                            type);
+            c.response.setHeader("Location", c.base() + "/api/now/attachment/" + id);
+            return json(map("result", metadata(c, row)), 201);
+        }
         method(method, "GET");
         String select =
                 "SELECT a.sys_id,a.name AS file_name,a.record_id AS table_sys_id,r.\"table\" AS"
-                        + " table_name,length(a.content) AS size_bytes";
+                        + " table_name,a.content_type,length(a.content) AS size_bytes";
         String from = " FROM os_attachment a JOIN os_record r ON r.sys_id=a.record_id";
         if (path.equals("/api/now/attachment")) {
             c.uniqueQuery();
@@ -745,7 +805,7 @@ public class WebController {
         if (!content) return json(map("result", metadata), 200);
         disposition(c, (String) row.get("file_name"));
         c.response.setHeader("X-Attachment-Metadata", JSON.writeValueAsString(metadata));
-        return binary((byte[]) row.get("content"), "application/octet-stream", 200);
+        return binary((byte[]) row.get("content"), (String) row.get("content_type"), 200);
     }
 
     private static Map<String, Object> metadata(Request c, Map<String, Object> row) {
@@ -761,7 +821,7 @@ public class WebController {
                 "size_bytes",
                 row.get("size_bytes").toString(),
                 "content_type",
-                "application/octet-stream",
+                row.get("content_type"),
                 "download_link",
                 c.base() + "/api/now/attachment/" + row.get("sys_id") + "/file");
     }
@@ -863,6 +923,7 @@ public class WebController {
     private static ModelAndView binary(byte[] bytes, String type, int status) {
         View view =
                 (model, request, response) -> {
+                    response.setCharacterEncoding((String) null);
                     response.setContentType(type);
                     response.setContentLength(bytes.length);
                     response.getOutputStream().write(bytes);

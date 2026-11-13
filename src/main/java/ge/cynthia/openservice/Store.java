@@ -87,6 +87,15 @@ public class Store {
                         + " KEY,record_id VARCHAR(32) NOT NULL,name VARCHAR(255) NOT NULL,content "
                             + binary
                             + " NOT NULL)");
+            try (var columns =
+                    db.connection
+                            .getMetaData()
+                            .getColumns(null, null, "os_attachment", "content_type")) {
+                if (!columns.next())
+                    db.update(
+                            "ALTER TABLE os_attachment ADD COLUMN content_type VARCHAR(255) NOT"
+                                    + " NULL DEFAULT 'application/octet-stream'");
+            }
             for (String[] index :
                     List.of(
                             new String[] {"ix_os_record_table", "os_record", "\"table\""},
