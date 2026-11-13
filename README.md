@@ -119,4 +119,4 @@ SSO, granular ACL/domain isolation, rate limiting, malware scanning, background 
 
 ## Count aggregates
 
-The read-only `/api/now/stats/{table}` subset now supports filtered counts, grouping and aggregate ordering over the complete selection. See [API details](docs/api.md) and the updated [78-test validation results](docs/validation.md).
+The read-only `/api/now/stats/{table}` subset now supports filtered counts, grouping and aggregate ordering over the complete selection. Table and Aggregate APIs both support bounded `IN` and `NOT IN` membership filters. See [API details](docs/api.md) and the updated [88-test validation results](docs/validation.md).

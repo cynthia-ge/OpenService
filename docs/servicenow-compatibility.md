@@ -9,7 +9,7 @@ Target: a bounded subset of the **Australia Table API documentation**, accessed 
 | OS-001 | A4(a) | Table CRUD and JSON envelopes | Implemented subset: seven configured tables, unversioned routes, bounded parameters. API details in `api.md`. |
 | OS-002 | A1 | Shared schema and persistence | Partial: registry drives validation and forms. No native sys_db_object/sys_dictionary CRUD, table inheritance or typed reference resolution. |
 | OS-003 | A2 | Workspaces, forms, lists | Implemented original UI: overview, record forms, search, paging, dictionary, history and migration. No native UI16/g_form compatibility. |
-| OS-004 | A4(d) | Encoded queries | Partial: equality, inequality, contains, starts-with, AND and ordering; database filtering. No full grammar or scripting. |
+| OS-004 | A4(d) | Encoded queries | Partial: equality, inequality, contains, starts-with, IN/NOT IN, AND and ordering; database filtering. No full grammar or scripting. |
 | OS-005 | A4(e) | Identity and access | Partial: local admin/agent/reader, Basic and session auth, CSRF. No OAuth/SSO, field ACLs or domain separation. |
 | OS-006 | A3 | Incident/change/request/problem workflows | Partial: local state machines, approval by admin, revision checks. Not verified vendor state/BR semantics. |
 | OS-007 | A1/A4(a) | Audit, journal and files | Partial: persistent record events, internal notes and attachments. No native journal/Attachment API or full activity semantics. |
@@ -39,3 +39,13 @@ Reproduce results with the commands in the README. Record the final measured cou
 ## Count aggregation iteration — 13 November 2026
 
 [Primary Aggregate API reference](https://www.servicenow.com/docs/r/api-reference/rest-apis/c_AggregateAPI.html?contentId=z1y5kSDzdmS5hEs40YMlSQ), Australia documentation updated 2026-04-21. Implements stored-value counts over the full filtered selection, optional groupings and COUNT/field ordering. Numeric aggregate functions and display-value resolution are explicitly rejected. Baseline HEAD: `4360f0a868633f7b7dba9b3b2e415da1d5bcf4c5`.
+
+## OS-004 continuation — membership filters, 13 November 2026
+
+Baseline HEAD 512a471, main, clean tree. Blueprint A4(d). Selected the missing IN/NOT IN subset over native attachments (OS-012, missing) and upgrade migrations (OS-014, missing), extending the common database selection layer used by table and aggregate reads.
+
+Contract: Australia encoded-query operator documentation, dated 2026-03-12, retrieved 2026-11-13 from the [official Australia documentation source](https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/platform-user-interface/r_OpAvailableFiltersQueries.md). The generic documentation route now returns Brazil; Australia source is the selected evidence. Literal stored-value comma-list matching is implemented; local limits and empty/null behavior are specified in api.md. No vendor-instance conformance claim.
+
+Implementation service.py; test_membership.py has 10 acceptance cases. Two positive regressions failed before implementation. Checks cover both APIs, AND/order/pagination/count/group composition, IDs, duplicate and missing values, exact literal wildcard/quote/space data, role/authentication boundaries, unknown fields and malformed/oversized lists. SQLite: 88 tests, 515/515 lines and 180/180 branches including the setup helper; service.py 160/160 lines and 76/76 branches. Runtime alone is 499/499 lines and 178/178 branches.
+
+The same 88-test suite and full line/branch coverage also pass against PostgreSQL 17 in disposable Docker containers. No demo database or external ServiceNow instance was used.

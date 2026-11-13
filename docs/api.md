@@ -27,3 +27,7 @@ The current error envelope is `{error:{message,detail},status:"failure"}`; messa
 ## Count aggregates
 
 `GET /api/now/stats/{table}?sysparm_count=true` returns `{result: {stats: {count: "N"}}}`. Supports the existing encoded `sysparm_query`, comma-separated `sysparm_group_by`, and `sysparm_order_by=COUNT` or a grouped field, optionally suffixed `^DESC`. Grouped results are arrays with `stats` and `groupby_fields`; empty grouped results are `[]`. Counts use the full selection, independent of Table API pagination. `sysparm_display_value=false` is the only supported display mode. Unknown/repeated parameters, invalid groups, and other aggregate functions fail explicitly. Existing authentication and reader permissions apply.
+
+### Membership filters
+
+Table and Aggregate APIs accept `fieldINa,b` and `fieldNOT INa,b` in sysparm_query. These match stored literal values; list order and duplicate values do not duplicate records. Combine with existing ^ AND and ORDERBY terms. List membership is evaluated in the database before pagination/grouping/counts. Supports 1–100 nonempty comma-separated values, without whitespace trimming or comma/caret escaping. Unknown fields and malformed lists return 400. There is no display-value/reference resolution, dynamic JavaScript, hierarchy membership or OR grammar. Empty stored strings are ordinary values and satisfy NOT IN when absent from the list; SQL NULLs do not match either operator.

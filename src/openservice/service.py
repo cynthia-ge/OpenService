@@ -97,11 +97,18 @@ def selection(db, table, encoded=""):
                 raise BadRequest("Unknown ordering field")
             ordering.append(columns[field].desc() if descending else columns[field].asc())
             continue
-        match = re.fullmatch(r'([a-z_][a-z_0-9]*)(!=|=|LIKE|STARTSWITH)(.*)', term)
+        match = re.fullmatch(r'([a-z_][a-z_0-9]*)(!=|=|LIKE|STARTSWITH|NOT IN|IN)(.*)', term)
         if not match or match[1] not in columns:
-            raise BadRequest("Supported query subset: field=value, !=, LIKE, STARTSWITH, AND (^), ORDERBY[DESC]")
+            raise BadRequest("Supported query subset: field=value, !=, LIKE, STARTSWITH, IN, NOT IN, AND (^), ORDERBY[DESC]")
         field, operator, value = match.groups()
         col = columns[field]
+        if operator in ('IN', 'NOT IN'):
+            values = value.split(',')
+            if len(values) > 100 or any(v == '' for v in values):
+                raise BadRequest('Membership requires 1–100 nonempty comma-separated values')
+            condition = col.in_(values)
+            query = query.where(~condition if operator == 'NOT IN' else condition)
+            continue
         conditions = {"=": lambda: col == value, "!=": lambda: col != value,
                       "LIKE": lambda: col.contains(value, autoescape=True),
                       "STARTSWITH": lambda: col.startswith(value, autoescape=True)}
