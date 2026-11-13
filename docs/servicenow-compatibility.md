@@ -193,3 +193,7 @@ Implemented local ADOPT-09 slice: bounded cursor pages, Older/Latest browser nav
 ## OS-043 — Accurate invitation availability
 
 Implemented local ADOPT-04/05 correction: derived invalidated/unavailable states match issuer and username eligibility; public redemption, replacement guidance and revocation agree. Product-specific vendor magic-link documentation informs lifecycle handling without implying a universal invite API. See [cycle 18](platform-foundations.md).
+
+## OS-044 — Account group-access review and removal
+
+Implemented local ADOPT-03/05/06/09 slice: per-account group review and atomic bulk membership withdrawal with security audit and request-time enforcement. Vendor group-removal workflows inform this local extension; inherited group roles and complete deprovisioning are not implemented. See [cycle 19](platform-foundations.md).

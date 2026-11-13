@@ -48,6 +48,60 @@ class BrowserTest {
     }
 
     @Test
+    void administratorOffboardsGroupMembershipsFromAnAccount() throws Exception {
+        String name = "OffboardBrowser" + id().substring(0, 8), user, record;
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db, map("name", name, "role", "reader", "password", WorkflowSupport.PASSWORD));
+            user = RecordAccess.owner(db, name);
+            String actor = RecordAccess.owner(db, "admin");
+            String group =
+                    Service.create(
+                                    db,
+                                    "sys_user_group",
+                                    map("short_description", "Offboarding browser group"),
+                                    "admin")
+                            .get("sys_id")
+                            .toString();
+            GroupMembers.change(db, group, actor, map("user_id", user), true);
+            var item =
+                    Service.create(
+                            db,
+                            "incident",
+                            map("short_description", "Offboarding browser record"),
+                            "admin");
+            record = item.get("sys_id").toString();
+            RecordAccess.change(db, item, actor, map("visibility", "group", "group_id", group));
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var adminContext = browser.newContext();
+                var memberContext = browser.newContext()) {
+            var admin = adminContext.newPage();
+            var member = memberContext.newPage();
+            login(admin, "admin");
+            login(member, name);
+            assertEquals(200, member.navigate(base() + "/record/incident/" + record).status());
+            admin.navigate(base() + "/admin/accounts/" + user);
+            admin.getByRole(
+                            AriaRole.LINK,
+                            new Page.GetByRoleOptions().setName("Offboarding browser group"))
+                    .waitFor();
+            admin.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Remove all group memberships"))
+                    .click();
+            admin.getByText("No group memberships.", new Page.GetByTextOptions().setExact(true))
+                    .waitFor();
+            assertEquals(404, member.navigate(base() + "/record/incident/" + record).status());
+            admin.setViewportSize(390, 844);
+            assertTrue(
+                    (Boolean) admin.evaluate("document.documentElement.scrollWidth<=innerWidth"));
+        }
+    }
+
+    @Test
     void administratorSeesAndRevokesAnInvalidatedInvitation() throws Exception {
         String name = "UnavailableBrowser" + id().substring(0, 8);
         try (var db = store.open()) {

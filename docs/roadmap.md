@@ -1,12 +1,12 @@
 # OpenService adoption roadmap and build order
 
-Initial assessment: 13 November 2026 at `9e636aa`, refreshed below through platform cycle 10 using implementation, test and container evidence. This is the implementation priority document for future OpenService work. The [compatibility ledger](servicenow-compatibility.md) describes supported behavior; this roadmap determines what to build next.
+Initial assessment: 13 November 2026 at `9e636aa`, refreshed below through platform cycle 19 using implementation, test and container evidence. This is the implementation priority document for future OpenService work. The [compatibility ledger](servicenow-compatibility.md) describes supported behavior; this roadmap determines what to build next.
 
 ## Current assessment after the foundation tranche
 
-The ten implementation cycles now provide versioned upgrades, stable user identities, revocable and time-bounded browser sessions, account activation/role management, password changes, lifecycle security events, manual invitation acceptance and administrator-assisted recovery. Evidence and exact per-cycle coverage are in [platform foundations](platform-foundations.md) and [validation](validation.md).
+The completed platform slices provide versioned upgrades, stable identities, revocable/time-bounded sessions, account state and role management, password changes, manual invitations and assisted recovery. They now also include private/group record visibility, group rosters and account-level membership removal, persistent password-attempt limits, account search and filtered pages, accurate invitation availability, and browsable/downloadable security and authentication journals. Evidence and exact per-cycle coverage are in [platform foundations](platform-foundations.md) and [validation](validation.md).
 
-M0 remains the supported scope: a disposable local walkthrough with synthetic data. M1–M3 remain unmet. The next ready work is resource/field visibility and memberships (ADOPT-03/06), authentication abuse controls/MFA policy (ADOPT-08), and reliable verified delivery (ADOPT-07/04/05). Security-event retention/export and authentication-attempt logging remain partial (ADOPT-09). Restore/upgrade drills, monitoring, workload evidence and named support ownership remain pilot gates. Manual bearer links do not establish verified email, enterprise identity or customer isolation.
+M0 remains the supported scope: a disposable local walkthrough with synthetic data. M1–M3 remain unmet. The next ready work includes private-record handover (ADOPT-05), requester/field visibility and inherited group roles (ADOPT-03/06), MFA/enterprise identity (ADOPT-08), and reliable verified delivery (ADOPT-07/04/05). Protected audit retention/collection and export auditing remain partial (ADOPT-09). Restore/upgrade drills, monitoring, workload evidence and named support ownership remain pilot gates. Manual bearer links do not establish verified email, enterprise identity or customer isolation.
 
 ## Starting assessment at `9e636aa` (historical)
 
@@ -146,3 +146,5 @@ Cycle 16 / ADOPT-03/05: administrators can find accounts by literal username, ro
 Cycle 17 / ADOPT-09: both journals now have bounded cursor pagination and administrator-only selected-page JSON downloads. The former latest-100 visibility limitation is removed for retained entries. Tamper protection, external collection/alerting and enterprise retention remain open; M1 remains unmet.
 
 Cycle 18 / ADOPT-04/05: invitation availability now reflects issuer access/security changes and username conflicts, with matching link rejection and administrator guidance/revocation. Historical invitation browsing beyond 100 entries, reliable delivery, verified addresses and token abuse limits remain open; M1 remains unmet.
+
+Cycle 19 / ADOPT-03/05/06/09: administrator account pages now show group memberships and can withdraw them atomically with account security evidence. Existing-session group access ends on the next request; inactive accounts can be cleaned up without losing history. Private ownership handover, profile/address lifecycle, automatic deprovisioning and complete offboarding remain open; M1 remains unmet.

@@ -46,6 +46,197 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void bulkMembershipRemovalCountsOnlyRowsItActuallyDeletes() throws Exception {
+        account("ConcurrentMember", "reader");
+        String user =
+                object(parsed(get("/api/openservice/me", auth("ConcurrentMember"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String group = add("sys_user_group").get("sys_id").toString();
+        assertEquals(
+                200,
+                json(
+                                "PUT",
+                                "/api/openservice/groups/" + group + "/members",
+                                map("user_id", user),
+                                auth("admin"))
+                        .statusCode());
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            java.util.concurrent.Future<HttpResponse<byte[]>> pending;
+            try (var deletion = store.open()) {
+                // This is the membership cleanup performed by group-record deletion.
+                assertEquals(
+                        1, deletion.update("DELETE FROM os_group_member WHERE group_id=?", group));
+                pending =
+                        executor.submit(() ->
+                                json(
+                                        "POST",
+                                        "/api/openservice/users/" + user + "/memberships/remove",
+                                        map(),
+                                        auth("admin")));
+                try {
+                    if (deletion.postgres) {
+                        boolean blocked = false;
+                        for (int i = 0; i < 500; i++) {
+                            if (deletion.count(
+                                            "SELECT COUNT(*) FROM pg_stat_activity WHERE query LIKE"
+                                                + " 'DELETE FROM os_group_member WHERE user_id=%'"
+                                                + " AND wait_event_type='Lock'")
+                                    > 0) {
+                                blocked = true;
+                                break;
+                            }
+                            deletion.all("SELECT pg_stat_clear_snapshot()");
+                            Thread.sleep(10);
+                        }
+                        assertTrue(
+                                blocked,
+                                "Bulk deletion must overlap the uncommitted group cleanup");
+                    }
+                } finally {
+                    deletion.connection.commit();
+                }
+            }
+            var response = pending.get(15, java.util.concurrent.TimeUnit.SECONDS);
+            assertEquals(200, response.statusCode());
+            assertEquals(0, object(parsed(response).get("result")).get("removed_count"));
+        }
+        try (var db = store.open()) {
+            assertEquals(
+                    0,
+                    db.count(
+                            "SELECT COUNT(*) FROM os_security_event WHERE"
+                                    + " action='account.memberships_removed'"));
+        }
+    }
+
+    @Test
+    void accountMembershipRemovalIsAtomicAuditedAndEffectiveForExistingSessions() throws Exception {
+        account("DepartingMember", "reader");
+        account("RetainedMember", "agent");
+        String user =
+                object(parsed(get("/api/openservice/me", auth("DepartingMember"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String other =
+                object(parsed(get("/api/openservice/me", auth("RetainedMember"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String api = "/api/openservice/users/" + user + "/memberships", remove = api + "/remove";
+        String page = "/admin/accounts/" + user;
+        assertEquals(200, get(api, auth("admin")).statusCode());
+        assertEquals(List.of(), parsed(get(api, auth("admin"))).get("result"));
+        var groups = new ArrayList<String>();
+        for (int i = 0; i < 2; i++) {
+            String group = add("sys_user_group").get("sys_id").toString();
+            groups.add(group);
+            for (String member : List.of(user, other))
+                assertEquals(
+                        200,
+                        json(
+                                        "PUT",
+                                        "/api/openservice/groups/" + group + "/members",
+                                        map("user_id", member),
+                                        auth("admin"))
+                                .statusCode());
+        }
+        String record = add("incident").get("sys_id").toString();
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/access/incident/" + record,
+                                map("visibility", "group", "group_id", groups.getFirst()),
+                                auth("admin"))
+                        .statusCode());
+        var memberships = objects(parsed(get(api, auth("admin"))).get("result"));
+        assertEquals(2, memberships.size());
+        assertEquals(Set.of("group_id", "name"), memberships.getFirst().keySet());
+        assertEquals("Synthetic evaluation", memberships.getFirst().get("name"));
+        assertTrue(html(get(page, auth("admin"))).contains(groups.getFirst()));
+        assertEquals(401, get(api, null).statusCode());
+        for (String actor : List.of("DepartingMember", "RetainedMember")) {
+            assertEquals(403, get(api, auth(actor)).statusCode());
+            assertEquals(403, json("POST", remove, map(), auth(actor)).statusCode());
+        }
+        assertEquals(405, json("POST", api, map(), auth("admin")).statusCode());
+        assertEquals(405, get(remove, auth("admin")).statusCode());
+        assertEquals(400, get(api + "?x=1", auth("admin")).statusCode());
+        assertEquals(400, json("POST", remove + "?x=1", map(), auth("admin")).statusCode());
+        assertEquals(400, json("POST", remove, map("extra", true), auth("admin")).statusCode());
+        assertEquals(404, get(api.replace(user, "0".repeat(32)), auth("admin")).statusCode());
+        assertEquals(
+                404,
+                json("POST", remove.replace(user, "0".repeat(32)), map(), auth("admin"))
+                        .statusCode());
+        String adminId;
+        try (var db = store.open()) {
+            adminId = RecordAccess.owner(db, "admin");
+            GroupMembers.removeForUser(db, adminId, user);
+            // Closing without commit must restore memberships and its audit event together.
+        }
+        assertEquals(2, objects(parsed(get(api, auth("admin"))).get("result")).size());
+        login("DepartingMember");
+        assertEquals(200, get("/api/now/table/incident/" + record, null).statusCode());
+        var result = object(parsed(json("POST", remove, map(), auth("admin"))).get("result"));
+        assertEquals(2, result.get("removed_count"));
+        assertEquals(new TreeSet<>(groups), new TreeSet<>((List<String>) result.get("group_ids")));
+        assertEquals(404, get("/api/now/table/incident/" + record, null).statusCode());
+        assertEquals(200, get("/api/openservice/me", null).statusCode());
+        assertEquals(
+                200, get("/api/now/table/incident/" + record, auth("RetainedMember")).statusCode());
+        assertEquals(
+                0,
+                object(parsed(json("POST", remove, map(), auth("admin"))).get("result"))
+                        .get("removed_count"));
+        try (var db = store.open()) {
+            var events =
+                    db.all(
+                            "SELECT * FROM os_security_event WHERE"
+                                    + " action='account.memberships_removed'");
+            assertEquals(1, events.size());
+            assertEquals(adminId, events.getFirst().get("actor_id"));
+            assertEquals(user, events.getFirst().get("target_id"));
+            assertEquals(2, object(events.getFirst().get("detail")).get("removed_count"));
+            assertEquals("reader", Service.account(db, user).get("role"));
+            assertEquals(true, Service.account(db, user).get("active"));
+        }
+        // Clean up memberships on an inactive account through the real administrator form.
+        assertEquals(
+                200,
+                json(
+                                "PUT",
+                                "/api/openservice/groups/" + groups.getFirst() + "/members",
+                                map("user_id", user),
+                                auth("admin"))
+                        .statusCode());
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + user + "/status",
+                                map("active", false),
+                                auth("admin"))
+                        .statusCode());
+        String csrf = login("admin");
+        assertEquals(403, form(page + "/memberships/remove", map(), null).statusCode());
+        assertEquals(302, form(page + "/memberships/remove", map("csrf", csrf), null).statusCode());
+        assertEquals(
+                200,
+                json(
+                                "PATCH",
+                                "/api/openservice/users/" + user + "/status",
+                                map("active", true),
+                                auth("admin"))
+                        .statusCode());
+        new Store(environment);
+        assertEquals(List.of(), parsed(get(api, null)).get("result"));
+        assertEquals(
+                404,
+                get("/api/now/table/incident/" + record, auth("DepartingMember")).statusCode());
+    }
+
+    @Test
     void invitationAvailabilityReflectsIssuerRevocationAndUsernameConflicts() throws Exception {
         String api = "/api/openservice/invitations";
         account("AvailabilityIssuer", "admin");

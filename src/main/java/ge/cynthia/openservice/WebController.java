@@ -670,6 +670,34 @@ public class WebController {
                     ? json(map("result", map("revoked", true)), 200)
                     : redirect("/admin/accounts/" + recoveryRevoke.group(1));
         }
+        Matcher accountMemberships =
+                Pattern.compile("/api/openservice/users/([0-9a-f]{32})/memberships").matcher(path);
+        if (accountMemberships.matches()) {
+            method(method, "GET");
+            c.admin();
+            c.noQuery();
+            return json(
+                    map("result", GroupMembers.forUser(c.db, accountMemberships.group(1))), 200);
+        }
+        Matcher removeMemberships =
+                Pattern.compile(
+                                "/(?:admin/accounts|api/openservice/users)/([0-9a-f]{32})/memberships/remove")
+                        .matcher(path);
+        if (removeMemberships.matches()) {
+            method(method, "POST");
+            c.admin();
+            c.noQuery();
+            c.uniqueQuery();
+            boolean api = path.startsWith("/api/");
+            if (api && !object(body(c)).isEmpty())
+                throw new Failure(400, "Provide an empty JSON object");
+            var result =
+                    GroupMembers.removeForUser(
+                            c.db, c.user.get("user_id").toString(), removeMemberships.group(1));
+            return api
+                    ? json(map("result", result), 200)
+                    : redirect("/admin/accounts/" + removeMemberships.group(1));
+        }
         Matcher accountRole =
                 Pattern.compile("/api/openservice/users/([0-9a-f]{32})/role").matcher(path);
         if (accountRole.matches()) {
@@ -1076,6 +1104,8 @@ public class WebController {
                                 error,
                                 "roles",
                                 Service.ROLES,
+                                "memberships",
+                                GroupMembers.forUser(c.db, id),
                                 "recovery",
                                 recovery));
         result.setStatus(HttpStatus.valueOf(status));
