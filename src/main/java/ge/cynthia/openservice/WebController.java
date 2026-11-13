@@ -444,13 +444,20 @@ public class WebController {
             Object change =
                     api
                             ? body(c)
-                            : map(
-                                    "visibility",
-                                    c.parameter("visibility", ""),
-                                    "owner_id",
-                                    c.parameter("visibility", "").equals("private")
-                                            ? RecordAccess.owner(c.db, c.parameter("owner", ""))
-                                            : "");
+                            : c.parameter("visibility", "").equals("group")
+                                    ? map(
+                                            "visibility",
+                                            "group",
+                                            "group_id",
+                                            c.parameter("group_id", ""))
+                                    : map(
+                                            "visibility",
+                                            c.parameter("visibility", ""),
+                                            "owner_id",
+                                            c.parameter("visibility", "").equals("private")
+                                                    ? RecordAccess.owner(
+                                                            c.db, c.parameter("owner", ""))
+                                                    : "");
             var result = RecordAccess.change(c.db, item, c.user.get("user_id").toString(), change);
             return api
                     ? json(map("result", result), 200)
@@ -900,6 +907,8 @@ public class WebController {
                         data,
                         "access",
                         item == null ? map() : RecordAccess.status(c.db, id),
+                        "accessGroups",
+                        c.role().equals("admin") ? RecordAccess.groups(c.db) : List.of(),
                         "members",
                         item != null && table.equals("sys_user_group") && c.role().equals("admin")
                                 ? GroupMembers.list(c.db, id)

@@ -169,3 +169,7 @@ Implemented local ADOPT-06 slice: administrator-selected private owner and consi
 ## OS-037 — Group membership administration
 
 Implemented local ADOPT-03 slice: administrator roster, add/remove, persistence, audit and cleanup. Australia group concepts are mapped, while group-role inheritance remains missing. See [cycle 12](platform-foundations.md) for acceptance and exact counters.
+
+## OS-038 — Group-restricted record visibility
+
+Implemented local ADOPT-06 slice: administrator policy selection, current-membership enforcement, revocation and fail-closed group deletion. Australia contextual-security concepts inform this behavior; programmable ACLs and inherited roles remain missing. See [cycle 13](platform-foundations.md) for acceptance and exact counters.

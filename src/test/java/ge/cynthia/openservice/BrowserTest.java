@@ -48,6 +48,65 @@ class BrowserTest {
     }
 
     @Test
+    void groupVisibilityChangesTakeEffectInAnAlreadySignedInBrowser() throws Exception {
+        String name = "TeamBrowser" + id().substring(0, 8), group, record;
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db, map("name", name, "role", "reader", "password", WorkflowSupport.PASSWORD));
+            group =
+                    Service.create(
+                                    db,
+                                    "sys_user_group",
+                                    map("short_description", "Browser privacy team"),
+                                    "admin")
+                            .get("sys_id")
+                            .toString();
+            record =
+                    Service.create(
+                                    db,
+                                    "incident",
+                                    map("short_description", "Team browser record"),
+                                    "admin")
+                            .get("sys_id")
+                            .toString();
+            GroupMembers.change(
+                    db,
+                    group,
+                    db.one("SELECT user_id FROM os_user WHERE name='admin'")
+                            .get("user_id")
+                            .toString(),
+                    map("user_id", RecordAccess.owner(db, name)),
+                    true);
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var adminContext = browser.newContext();
+                var memberContext = browser.newContext()) {
+            var admin = adminContext.newPage();
+            var member = memberContext.newPage();
+            login(admin, "admin");
+            login(member, name);
+            admin.navigate(base() + "/record/incident/" + record);
+            admin.getByLabel("Visibility", new Page.GetByLabelOptions().setExact(true))
+                    .selectOption("group");
+            admin.getByLabel("Allowed group").selectOption(group);
+            admin.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Save visibility"))
+                    .click();
+            assertEquals(200, member.navigate(base() + "/record/incident/" + record).status());
+            admin.navigate(base() + "/record/sys_user_group/" + group);
+            admin.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Remove " + name).setExact(true))
+                    .click();
+            assertEquals(404, member.reload().status());
+            admin.setViewportSize(390, 844);
+            assertTrue(
+                    (Boolean) admin.evaluate("document.documentElement.scrollWidth<=innerWidth"));
+        }
+    }
+
+    @Test
     void administratorAddsAndRemovesAGroupMemberInTheBrowser() throws Exception {
         String name = "GroupBrowser" + id().substring(0, 8), group;
         try (var db = store.open()) {

@@ -4,7 +4,7 @@ import java.sql.SQLException;
 
 /** Ordered, transactional upgrades. The caller commits schema and bootstrap data together. */
 final class Migrations {
-    static final int VERSION = 9;
+    static final int VERSION = 10;
 
     private Migrations() {}
 
@@ -106,8 +106,14 @@ final class Migrations {
         if (version < 9) {
             db.update(
                     "CREATE TABLE IF NOT EXISTS os_group_member(group_id VARCHAR(32) NOT"
-                        + " NULL,user_id VARCHAR(32) NOT NULL,PRIMARY KEY(group_id,user_id))");
+                            + " NULL,user_id VARCHAR(32) NOT NULL,PRIMARY KEY(group_id,user_id))");
             db.update("INSERT INTO os_migration(version,name) VALUES(9,?)", "group membership");
+        }
+        if (version < 10) {
+            addColumn(db, "os_record_access", "group_id", "VARCHAR(32) NOT NULL DEFAULT ''");
+            db.update(
+                    "INSERT INTO os_migration(version,name) VALUES(10,?)",
+                    "group record visibility");
         }
     }
 

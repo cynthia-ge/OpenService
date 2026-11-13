@@ -44,6 +44,129 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void groupVisibilityEnforcesMembershipAcrossEverySurfaceAndRevokesExistingSessions()
+            throws Exception {
+        account("TeamMember", "agent");
+        account("OtherTeam", "agent");
+        account("TeamReader", "reader");
+        String member =
+                object(parsed(get("/api/openservice/me", auth("TeamMember"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String reader =
+                object(parsed(get("/api/openservice/me", auth("TeamReader"))).get("result"))
+                        .get("user_id")
+                        .toString();
+        String group = add("sys_user_group").get("sys_id").toString(),
+                id = add("incident").get("sys_id").toString();
+        String members = "/api/openservice/groups/" + group + "/members",
+                access = "/api/openservice/access/incident/" + id,
+                api = "/api/now/table/incident/" + id,
+                page = "/record/incident/" + id;
+        assertEquals(
+                200,
+                json("PATCH", api, map("short_description", "TeamConfidential"), auth("admin"))
+                        .statusCode());
+        assertEquals(
+                302,
+                upload(page + "/attachment", "team-secret.bin", new byte[] {3, 1, 4}, auth("admin"))
+                        .statusCode());
+        String file =
+                objects(parsed(get("/api/now/attachment", auth("admin"))).get("result"))
+                        .getFirst()
+                        .get("sys_id")
+                        .toString();
+        for (Object bad :
+                List.of(
+                        map("visibility", "group", "group_id", id),
+                        map("visibility", "group", "group_id", ""),
+                        map("visibility", "group", "group_id", null),
+                        map("visibility", "private")))
+            assertEquals(400, json("PATCH", access, bad, auth("admin")).statusCode());
+        var policy =
+                object(
+                        parsed(
+                                        json(
+                                                "PATCH",
+                                                access,
+                                                map("visibility", "group", "group_id", group),
+                                                auth("admin")))
+                                .get("result"));
+        assertEquals(group, policy.get("group_id"));
+        assertEquals("", policy.get("owner_id"));
+        assertEquals(404, get(api, auth("TeamMember")).statusCode());
+        assertEquals(200, json("PUT", members, map("user_id", member), auth("admin")).statusCode());
+        assertEquals(200, json("PUT", members, map("user_id", reader), auth("admin")).statusCode());
+        new Store(environment);
+        for (String path :
+                List.of(
+                        api,
+                        page,
+                        "/attachment/" + file,
+                        "/api/now/attachment/" + file,
+                        "/api/now/attachment/" + file + "/file")) {
+            assertEquals(200, get(path, auth("TeamMember")).statusCode(), path);
+            assertEquals(404, get(path, auth("OtherTeam")).statusCode(), path);
+            assertEquals(200, get(path, auth("TeamReader")).statusCode(), path);
+        }
+        assertEquals(
+                403,
+                json("PATCH", api, map("description", "bad"), auth("TeamReader")).statusCode());
+        assertEquals(
+                200,
+                json("PATCH", api, map("description", "Team updated"), auth("TeamMember"))
+                        .statusCode());
+        assertEquals(
+                "1",
+                get("/api/now/table/incident", auth("TeamMember"))
+                        .headers()
+                        .firstValue("X-Total-Count")
+                        .orElseThrow());
+        login("TeamMember");
+        assertEquals(200, get(page, null).statusCode());
+        assertEquals(
+                200, json("DELETE", members + "/" + member, map(), auth("admin")).statusCode());
+        assertEquals(404, get(page, null).statusCode());
+        for (String name : List.of("TeamMember", "OtherTeam")) {
+            for (String path :
+                    List.of(
+                            "/",
+                            "/workspace/incident",
+                            "/audit",
+                            "/export/incident",
+                            "/export/incident?source=true",
+                            "/api/now/table/incident",
+                            "/api/now/attachment")) {
+                var response = get(path, auth(name));
+                assertEquals(200, response.statusCode(), path);
+                assertFalse(html(response).contains("TeamConfidential"), path);
+                assertFalse(html(response).contains(file), path);
+            }
+            assertEquals(
+                    map("result", map("stats", map("count", "0"))),
+                    parsed(get("/api/now/stats/incident?sysparm_count=true", auth(name))));
+            assertEquals(
+                    404, json("PATCH", api, map("description", "denied"), auth(name)).statusCode());
+            assertEquals(404, form(page + "/note", map("body", "denied"), auth(name)).statusCode());
+            assertEquals(
+                    404,
+                    upload(page + "/attachment", "denied.bin", new byte[] {1}, auth(name))
+                            .statusCode());
+        }
+        assertEquals(
+                204,
+                json("DELETE", "/api/now/table/sys_user_group/" + group, map(), auth("admin"))
+                        .statusCode());
+        assertEquals(404, get(api, auth("TeamReader")).statusCode());
+        assertEquals(200, get(api, auth("admin")).statusCode());
+        assertEquals(
+                200,
+                json("PATCH", access, map("visibility", "workspace", "owner_id", ""), auth("admin"))
+                        .statusCode());
+        assertEquals(200, get(api, auth("OtherTeam")).statusCode());
+    }
+
+    @Test
     void administratorManagesPersistentGroupMembershipWithoutRoleEscalation() throws Exception {
         account("GroupAgent", "agent");
         account("GroupReader", "reader");
@@ -126,13 +249,13 @@ abstract class WorkflowSupport {
                     2,
                     db.count(
                             "SELECT COUNT(*) FROM os_event WHERE record_id=? AND"
-                                + " action='member_added'",
+                                    + " action='member_added'",
                             group));
             assertEquals(
                     2,
                     db.count(
                             "SELECT COUNT(*) FROM os_event WHERE record_id=? AND"
-                                + " action='member_removed'",
+                                    + " action='member_removed'",
                             group));
         }
         try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {

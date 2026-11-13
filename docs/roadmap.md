@@ -134,3 +134,5 @@ ADOPT-05/08/09 now include administrator-assisted, reauthenticated 15-minute rec
 Cycle 11 / ADOPT-06: private-account record visibility now spans UI/API reads and mutations, lists/counts/export/audit/attachments, including retained audit after deletion. Existing records remain workspace-visible until explicitly restricted. Field ACLs, requester defaults, group memberships and multi-organization isolation remain open; M1 is unmet.
 
 Cycle 12 / ADOPT-03/06: persistent group membership now has administrator UI/API, idempotence, audit and deletion cleanup. Inherited roles, team record visibility, requester defaults and field ACLs remain separate work. M1 remains unmet.
+
+Cycle 13 / ADOPT-06: administrator-selected group visibility is enforced across every existing record surface using current membership, including removal in existing sessions and fail-closed group deletion. Requester defaults, field ACLs, inherited roles and enterprise identity remain open; M1 remains unmet.
