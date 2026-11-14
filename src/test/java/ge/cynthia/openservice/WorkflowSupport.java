@@ -46,6 +46,36 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void internalNotesStayWithinFulfillerHistory() throws Exception {
+        account("reader", "reader");
+        account("agent", "agent");
+        String record = add("incident").get("sys_id").toString(), secret = "internal-only-" + id();
+        try (var db = store.open()) {
+            Service.audit(
+                    db,
+                    Service.record(db, "incident", record),
+                    "admin",
+                    "note",
+                    map("body", secret));
+            db.connection.commit();
+        }
+        for (String path : List.of("/record/incident/" + record, "/audit")) {
+            assertFalse(html(get(path, auth("reader"))).contains(secret));
+            assertTrue(html(get(path, auth("agent"))).contains(secret));
+            assertTrue(html(get(path, auth("admin"))).contains(secret));
+        }
+        assertTrue(html(get("/audit", auth("reader"))).contains("created"));
+        login("reader");
+        assertEquals(
+                403,
+                form(
+                                "/record/incident/" + record + "/note",
+                                map("csrf", csrf(get("/account", null)), "body", "denied"),
+                                null)
+                        .statusCode());
+    }
+
+    @Test
     void creationHonorsInitialStateRolePolicy() throws Exception {
         var a = new ConfigurationAcceptance(this);
         try {

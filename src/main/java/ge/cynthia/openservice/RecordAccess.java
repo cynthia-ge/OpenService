@@ -23,6 +23,10 @@ final class RecordAccess {
                 + " m.user_id=?))))";
     }
 
+    static String journalFilter(Store.Db db) {
+        return "reader".equals(db.viewerRole) ? "action<>'note'" : "1=1";
+    }
+
     static Map<String, Object> status(Store.Db db, String id) throws SQLException {
         var row =
                 db.one(
@@ -65,7 +69,7 @@ final class RecordAccess {
         } else if (group) {
             if (db.one(
                             "SELECT sys_id FROM os_record WHERE sys_id=? AND"
-                                + " \"table\"='sys_user_group'",
+                                    + " \"table\"='sys_user_group'",
                             groupId)
                     == null) throw new Failure(400, "Choose an existing group");
         } else if (!principal.isEmpty())

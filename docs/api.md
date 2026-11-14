@@ -180,3 +180,7 @@ Administrator `GET /api/openservice/configuration` exports current definitions a
 ## Typed numeric reports
 
 Authenticated `GET /api/openservice/analytics/{table}?field=estimate` reports count, value count, sum, min, max and average over all authorized matching rows. Optional `group_by` and `q` select grouping and the existing encoded-query filter. See [analytics](analytics.md) for numeric precision, blanks, empty selections and limits.
+
+### Internal activity visibility
+
+Local internal-note events are visible only to agents and administrators who can access the record. Readers receive ordinary record activity but no internal-note text in either record detail or `/audit`. This rule does not classify arbitrary imported fields, hide ordinary attachments or implement a full field ACL engine.

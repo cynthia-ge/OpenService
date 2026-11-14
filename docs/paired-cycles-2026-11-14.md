@@ -15,3 +15,13 @@ Discovery: retrieved [Australia contextual security](https://raw.githubuserconte
 QA round 1: reviewed the complete diff, shared create callers, transaction rollback, update/import differences and policy defaults. One reproduced creation bypass fixed; no reopened findings. Required checks pending.
 
 QA round 2: complete accumulated diff re-reviewed against `d208efc`; no new/reopened defects, no repairs, no unresolved findings. Checks: 407 tests, zero failures/errors/skips; exact project coverage 2,428/2,428 lines, 1,298/1,298 branches, 157/157 methods across all 22 Java files. Touched Service.java: 455/455 lines, 284/284 branches, 34/34 methods. Skill exact-count gate and `git diff --check` pass. OS-Q10-01 implemented.
+
+## Cycle 2 — internal-note visibility (OS-Q10-02)
+
+QA base `103c5bd`. Areas OS-PARITY-02/08, ADOPT-06, blueprint A1/A4(e). The pre-fix HTTP regression reproduced internal-note text in reader history. A shared SQL predicate now excludes local `note` events for readers before fetching either the record timeline or global audit, preserving record visibility and the audit limit. Agent/admin access and ordinary reader activity remain intact; browser regression covers both views. Legacy imported record fields and arbitrary field ACLs are outside this slice.
+
+Discovery on 2026-11-14: [Task fields](https://www.servicenow.com/docs/r/platform-administration/table-administration-and-data-management/r_ImportantTaskTableFields.html) distinguishes fulfiller work notes from comments; the resolved page is Brazil, so local roles are an explicit mapping, not an Australia wire-conformance claim. Reviewed [new release features](https://www.servicenow.com/docs/r/release-notes/rn-summary-new-features.html) and [article versioning](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/article-versioning.html). Knowledge versioning requires the Advanced plugin and configuration; merge into OS-PARITY-04 instead of claiming all subscriptions include it. Next: public comments and journal synchronization.
+
+QA round 1: one reproduced note exposure fixed; reviewed both SQL call sites, record-access conjunction, audit LIMIT ordering, deletion/import payloads and browser behavior. No reopened or unresolved findings after repair; full gates pending.
+
+QA round 2: full diff re-reviewed against `103c5bd`; zero new/reopened/unresolved findings, no repairs. 409 tests pass, zero failures/errors/skips. Exact project: 2,431/2,431 lines, 1,300/1,300 branches, 158/158 methods. Touched RecordAccess.java: 42/42, 34/34, 6/6; WebController.java: 1,091/1,091, 502/502, 39/39 (line/branch/method). Exact-count and whitespace gates pass. OS-Q10-02 implemented.

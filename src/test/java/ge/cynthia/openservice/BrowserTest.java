@@ -1084,6 +1084,16 @@ class BrowserTest {
                                         new Page.GetByRoleOptions().setName("New record"))
                                 .count());
                 page.navigate(recordUrl);
+                assertFalse(
+                        page.locator("main")
+                                .innerText()
+                                .contains("Verified incident transition and activity history."));
+                page.navigate(base() + "/audit");
+                assertFalse(
+                        page.locator("main")
+                                .innerText()
+                                .contains("Verified incident transition and activity history."));
+                page.navigate(recordUrl);
                 assertNotNull(
                         page.getByLabel("Summary", new Page.GetByLabelOptions().setExact(true))
                                 .getAttribute("readonly"));

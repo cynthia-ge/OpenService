@@ -962,6 +962,8 @@ public class WebController {
                     c.db.all(
                             "SELECT * FROM os_event WHERE "
                                     + RecordAccess.filter(c.db, "os_event.record_id", parameters)
+                                    + " AND "
+                                    + RecordAccess.journalFilter(c.db)
                                     + " ORDER BY seq DESC LIMIT 200",
                             parameters.toArray());
             events.forEach(event ->
@@ -1106,8 +1108,9 @@ public class WebController {
                         item == null
                                 ? List.of()
                                 : c.db.all(
-                                        "SELECT * FROM os_event WHERE record_id=? ORDER BY seq"
-                                                + " DESC",
+                                        "SELECT * FROM os_event WHERE record_id=? AND "
+                                                + RecordAccess.journalFilter(c.db)
+                                                + " ORDER BY seq DESC",
                                         id),
                         "attachments",
                         item == null
