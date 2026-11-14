@@ -10,16 +10,16 @@ Target: a bounded subset of the **Australia Table API documentation**, accessed 
 | OS-002 | A1 | Shared schema and persistence | Partial: configurable registry drives typed validation, forms, references and assignment checks; see configuration.md. No native sys_db_object/sys_dictionary CRUD, table inheritance or reference display-value resolution. |
 | OS-003 | A2 | Workspaces, forms, lists | Implemented original UI: overview, record forms, search, paging, dictionary, history and migration. No native UI16/g_form compatibility. |
 | OS-004 | A4(d) | Encoded queries | Partial: equality, inequality, contains/not-contains, starts-with, ends-with, IN/NOT IN, empty/not-empty, AND and ordering; database filtering. No full grammar or scripting. |
-| OS-005 | A2/A4(e) | Identity and access | Partial: local admin/agent/reader, administrator account-onboarding workspace, Basic and session auth, CSRF. No invites/email verification, account editing/reset/deactivation, OAuth/SSO, field ACLs or domain separation. |
+| OS-005 | A2/A4(e) | Identity and access | Partial: local admin/agent/reader, account administration, manual invitations/recovery, deactivation, groups, Basic/session authentication and CSRF. Verified delivery, OAuth/SSO, field ACLs and domain separation remain missing. |
 | OS-006 | A3 | Incident/change/request/problem workflows | Partial: reusable state machines, role-gated transitions, required fields per state and revision checks. No separate approval-request engine or verified vendor state/BR semantics. |
 | OS-007 | A1/A4(a) | Audit, journal and files | Partial: persistent record events, internal notes and attachments. Attachment upload/read/delete APIs; no native journal API or full activity semantics. |
 | OS-008 | Recommendations | Migration/import/export | Implemented bounded JSON/CSV path with dry-run, source retention, stable IDs and repeat-import skips. See migration limits. |
-| OS-009 | A3 | Configuration items/knowledge/groups | Partial: real CRUD workspaces; not full CMDB/IRE, knowledge publishing or group membership. |
+| OS-009 | A3 | Configuration items/knowledge/groups | Partial: CRUD workspaces, group membership and configurable asset/knowledge authoring examples. No full CMDB/IRE, requester knowledge publishing or discovery. |
 | OS-010 | Platform operations | Docker and multi-cloud infrastructure | Docker verified locally; AWS/GCP/Azure validated and mock-plan tested, not deployed. |
 | OS-011 | A1/A4(c) | Business rules and Glide runtime | Missing; prioritize a sandboxed, explicitly scoped implementation with source-backed semantics. |
 | OS-012 | A4(a) | Aggregate, native attachments, Import Set and Batch APIs | Partial: filtered/grouped count Aggregate API added; attachment upload/read/delete supported; numeric aggregates, attachment updates, Import Set and Batch remain missing. |
 | OS-013 | A1/A5 | Flow Designer, SLAs, catalog, update sets | Partial: local configuration packages and configurable workflow policies. Native Flow Designer, SLA timers, service catalogue and ServiceNow update-set compatibility remain missing. |
-| OS-014 | Enterprise operation | SSO, fine-grained ACLs, rate limits, workers, migrations | Partial: serialized versioned database upgrades; SSO, granular ACLs, rate limits and workers remain missing. |
+| OS-014 | Enterprise operation | SSO, fine-grained ACLs, rate limits, workers, migrations | Partial: serialized versioned upgrades, account/session controls, record visibility and persistent authentication-attempt limits. SSO, field ACLs and durable workers remain missing. |
 | OS-015 | Migration | Direct connector, attachments, journals, differential sync | Missing; next adoption-focused tranche. |
 
 ## Build priorities
@@ -211,3 +211,7 @@ Remaining shortlist: typed metrics (OS-PARITY-07); durable delivery/connectors (
 ## Typed numeric reporting — 2026-11-14
 
 OS-PARITY-07 now includes complete-selection sum/minimum/maximum/average reports for configured integer/decimal fields, optional grouping and encoded filtering, record-level visibility enforcement and a browser workspace. [Contract and evidence](analytics.md). Results use exact decimal accumulation and documented DECIMAL128 averages. SQLite/PostgreSQL tests explicitly cover 10,001 rows and private records; there is no Table API pagination shortcut. This is a local API extension; native numeric Aggregate API compatibility, saved/time-series reports and process mining remain open.
+
+## Bounded recovery verification — 2026-11-14
+
+OS-PARITY-10 / ADOPT-15: [restore-drill.sh](../scripts/restore-drill.sh) successfully restores a quiesced PostgreSQL dump to a separate database volume and verifies state through the rebuilt non-root application. [Scope and instructions](recovery.md). Production recovery objectives, online recovery, cross-version upgrades and high availability remain unverified.

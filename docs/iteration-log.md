@@ -159,3 +159,7 @@ Added original typed/schema configuration, reference and assignment integrity, s
 ## Typed numeric analytics tranche — 2026-11-14
 
 Added streaming, exact-decimal reporting over complete authorized selections, with grouping/filtering and a browser workspace. Verified 10,001-row selection correctness, hidden-record exclusion, null/blank semantics and typed field restrictions on both databases. Corrected an ambiguous browser control label. Final suite: 405 tests; 2427/2427 lines, 1298/1298 branch outcomes, 157/157 methods. Native numeric Aggregate API conformance and process mining remain open.
+
+## PostgreSQL recovery tranche — 2026-11-14
+
+Added a disposable, reproducible backup/restore drill and recovery runbook. Rebuilt the final app image; restored into a new volume after stopping the source database; verified configuration, records, security events, metrics, attachment bytes, account credentials and private visibility. Bash pipeline-failure behavior, syntax and missing-image cleanup were checked. No production database or cloud deployment was accessed. Java production source is unchanged from the passing 405-test/100%-coverage analytics commit.

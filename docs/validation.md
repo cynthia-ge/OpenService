@@ -1,3 +1,9 @@
+# Container recovery verification — 14 November 2026
+
+The final Java source was built into local Docker image `openservice:parity-20261114` (`sha256:7c0fe6a929badc5c4889dd0322a5d8bfea3cff190c2d14dbad591ef38421491c`). `bash scripts/restore-drill.sh openservice:parity-20261114` passed: source application/database stopped, custom-format dump restored to a different fresh PostgreSQL 17 volume, and a fresh application ran as UID 10001. Configuration, record, security-event and numeric-report snapshots matched; binary attachments matched byte-for-byte; restored account login and private-record denial passed. The final drill took 9 seconds locally, which is not a production recovery target.
+
+Bash syntax validation and the missing-image failure path passed. Successful and failed runs left no task-owned containers, volumes or networks. The script uses pipeline failure propagation, immutable image IDs during each run and generated disposable credentials. This operational check supplements the 405-test Java suite below; it does not establish high availability or enterprise adoption readiness.
+
 # Typed analytics verification — 14 November 2026
 
 Final `JAVA_HOME=<Temurin 27.0.1.0.2+1> ./mvnw clean verify`: **405 tests**, zero failures/errors/skips; whole-project **2427/2427 lines, 1298/1298 branch outcomes, 157/157 methods**. The exact-count skill gate passed all 22 production Java source files. No coverage exclusions or threshold changes were introduced. Templates are verified by Chromium journeys; Java coverage does not measure template or shell-script lines.

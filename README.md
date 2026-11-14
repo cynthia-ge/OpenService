@@ -115,3 +115,5 @@ The read-only `/api/now/stats/{table}` subset now supports filtered counts, grou
 Reusable typed tables, workflow policies and atomic configuration promotion are available in the [configuration workspace](docs/configuration.md), with an [installable service operations example](examples/service-operations.configuration.json). The [ten-area parity baseline](docs/roadmap.md#reusable-parity-baseline--14-november-2026) tracks remaining work.
 
 [Numeric analytics](docs/analytics.md) is available from each workspace for configured integer/decimal fields.
+
+A [disposable PostgreSQL restore drill](docs/recovery.md) verifies configuration, data, attachments, credentials and record-access controls in a fresh database.
