@@ -1098,6 +1098,15 @@ class BrowserTest {
                         page.getByLabel("Summary", new Page.GetByLabelOptions().setExact(true))
                                 .getAttribute("readonly"));
                 assertTrue(page.locator("select[name=state]").isDisabled());
+                page.getByLabel("Add a comment", new Page.GetByLabelOptions().setExact(true))
+                        .fill("Requester browser comment <script>alert(1)</script>");
+                page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Post comment"))
+                        .click();
+                page.reload();
+                assertTrue(
+                        page.locator("main")
+                                .innerText()
+                                .contains("Requester browser comment <script>alert(1)</script>"));
                 assertEquals(
                         0,
                         page.getByRole(

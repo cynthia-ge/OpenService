@@ -53,3 +53,5 @@ Final container acceptance after the ten feature slices uses the rebuilt Java 27
 Cycle 1: 407 tests pass; exact whole-project Java coverage 2,428/2,428 lines, 1,298/1,298 branches, 157/157 methods. See [per-cycle scope, QA rounds and subsequent results](paired-cycles-2026-11-14.md).
 
 Cycle 2: 409 passing tests; exact Java line/branch/method counts 2,431/2,431; 1,300/1,300; 158/158.
+
+Cycle 3: 411 passing tests; exact Java line/branch/method counts 2,454/2,454; 1,316/1,316; 160/160.

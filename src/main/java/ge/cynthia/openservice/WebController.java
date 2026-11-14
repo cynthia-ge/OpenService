@@ -155,7 +155,10 @@ public class WebController {
                                         "/account/password",
                                         "/api/openservice/me/password",
                                         "/api/openservice/me/sessions/revoke")
-                                .contains(path)) throw new Failure(403, "Read-only account");
+                                .contains(path)
+                        && !path.matches(
+                                "/(?:api/openservice/comments/[^/]+/[0-9a-f]{32}|record/[^/]+/[0-9a-f]{32}/comment)"))
+                    throw new Failure(403, "Read-only account");
                 // Configuration promotion, record writes and relationship deletion share a lock.
                 if (db.postgres) db.all("SELECT pg_advisory_xact_lock(18439,4)");
                 Authentication.requireCurrent(db, user);
@@ -543,6 +546,16 @@ public class WebController {
                                             revision))),
                     200);
         }
+        Matcher comments =
+                Pattern.compile("/api/openservice/comments/([^/]+)/([0-9a-f]{32})").matcher(path);
+        if (comments.matches()) {
+            method(method, "GET", "POST");
+            c.noQuery();
+            var item = Service.record(c.db, comments.group(1), comments.group(2));
+            if (method.equals("POST"))
+                return json(map("result", Comments.add(c.db, item, body(c), c.name())), 201);
+            return json(map("result", Comments.list(c.db, comments.group(2))), 200);
+        }
         Matcher analytics =
                 Pattern.compile("/(api/openservice/analytics|analytics)/([^/]+)").matcher(path);
         if (analytics.matches()) {
@@ -911,7 +924,8 @@ public class WebController {
                                                     String.valueOf((long) page.offset() + 30)))));
         }
         Matcher detail =
-                Pattern.compile("/record/([^/]+)/([^/]+)(?:/(note|attachment))?").matcher(path);
+                Pattern.compile("/record/([^/]+)/([^/]+)(?:/(note|attachment|comment))?")
+                        .matcher(path);
         if (detail.matches())
             return record(c, detail.group(1), detail.group(2), detail.group(3), method);
         Matcher download = Pattern.compile("/attachment/([^/]+)").matcher(path);
@@ -1015,7 +1029,9 @@ public class WebController {
         if (action != null) {
             method(method, "POST");
             if (item == null) throw new Failure(404, "Record not found");
-            if (action.equals("note")) {
+            if (action.equals("comment")) {
+                Comments.add(c.db, item, map("body", c.parameter("body", "")), c.name());
+            } else if (action.equals("note")) {
                 String note = c.parameter("body", "").strip();
                 if (note.isEmpty() || note.codePointCount(0, note.length()) > 65536)
                     throw new Failure(400, "Enter a note of 1–65536 characters");

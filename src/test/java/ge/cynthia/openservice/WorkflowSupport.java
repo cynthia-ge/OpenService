@@ -46,6 +46,11 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void sharedCommentsKeepRecordAndRoleBoundaries() throws Exception {
+        CommentAcceptance.run(this);
+    }
+
+    @Test
     void internalNotesStayWithinFulfillerHistory() throws Exception {
         account("reader", "reader");
         account("agent", "agent");

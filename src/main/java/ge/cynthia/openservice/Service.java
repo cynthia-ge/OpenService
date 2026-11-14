@@ -14,7 +14,8 @@ public final class Service {
                     "reader",
                     List.of(
                             "Reader",
-                            "View records, activity and attachments. Cannot change records."),
+                            "View records, activity and attachments; add shared comments. Cannot"
+                                + " change record fields."),
                     "agent",
                     List.of(
                             "Agent",

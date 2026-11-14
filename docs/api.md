@@ -184,3 +184,9 @@ Authenticated `GET /api/openservice/analytics/{table}?field=estimate` reports co
 ### Internal activity visibility
 
 Local internal-note events are visible only to agents and administrators who can access the record. Readers receive ordinary record activity but no internal-note text in either record detail or `/audit`. This rule does not classify arbitrary imported fields, hide ordinary attachments or implement a full field ACL engine.
+
+### Shared comments
+
+Authenticated readers, agents and administrators may append comments to records they can see. `GET /api/openservice/comments/{table}/{sys_id}` returns `{result:[...]}` with the newest 100 comments in descending `entry_id` order. Each row has `entry_id`, `actor`, `created` (UTC) and `detail.body`. Internal notes are never returned. `POST` accepts exactly `{"body":"text"}`, strips surrounding whitespace, requires 1–65,536 Unicode code points and returns the created row under `result` with status 201. Unknown query parameters are rejected; other methods return 405. Missing/inaccessible records return 404.
+
+The record page provides the same append-only journey. Browser mutations require CSRF; Basic authentication uses the existing API rules. Readers still cannot change record fields or add internal notes. Shared means visible to accounts with record access, not anonymous/public internet access. Comments do not increment field revisions, send notifications or provide edit/delete, pagination or idempotency-key contracts.
