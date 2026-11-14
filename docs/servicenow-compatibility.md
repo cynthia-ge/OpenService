@@ -215,3 +215,13 @@ OS-PARITY-07 now includes complete-selection sum/minimum/maximum/average reports
 ## Bounded recovery verification — 2026-11-14
 
 OS-PARITY-10 / ADOPT-15: [restore-drill.sh](../scripts/restore-drill.sh) successfully restores a quiesced PostgreSQL dump to a separate database volume and verifies state through the rebuilt non-root application. [Scope and instructions](recovery.md). Production recovery objectives, online recovery, cross-version upgrades and high availability remain unverified.
+
+## Paired-cycle discovery checkpoint — 2026-11-14
+
+See [paired-cycle evidence](paired-cycles-2026-11-14.md) for contracts, source retrieval, acceptance, QA rounds and exact coverage. OS-Q10-01 closes initial-state authorization under OS-PARITY-01/02/08 after its gates.
+
+| ID | Status / priority / area | Capability, dependency and acceptance | Evidence |
+|---|---|---|---|
+| OS-DISC-01 | Missing; P1/M2; OS-PARITY-08 | Granular operational administration, extending ADOPT-03. Separate diagnostic/audit access from identity, configuration and business-data administration; depends on configurable privileges. Prove an operator can inspect permitted diagnostics but cannot grant roles, change schemas or view restricted business records. Current three fixed roles do not provide this separation. | [Granular admin roles](https://www.servicenow.com/docs/r/platform-security/granular-admin-roles.html), retrieved 2026-11-14, Brazil platform security; individual product role scope/entitlements vary. |
+
+Checkpoint 1 reviewed authorization, Brazil release highlights and operational roles. New OS-DISC-01; state-entry correction OS-Q10-01. Next: field ACL/data-policy coverage. All existing M1–M3 adoption gaps remain open.

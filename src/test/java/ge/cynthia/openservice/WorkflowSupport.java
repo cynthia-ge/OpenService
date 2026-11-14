@@ -46,6 +46,46 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void creationHonorsInitialStateRolePolicy() throws Exception {
+        var a = new ConfigurationAcceptance(this);
+        try {
+            account("agent", "agent");
+            var definition = ConfigurationAcceptance.definition();
+            object(definition.get("fields")).put("state", "State");
+            definition.put("states", map("draft", "Draft"));
+            definition.put("transition_rules", map("draft", map("roles", List.of("admin"))));
+            assertEquals(
+                    200,
+                    a.install(ConfigurationAcceptance.bundle(a.table, definition), false)
+                            .statusCode());
+            String path = "/api/now/table/" + a.table;
+            assertEquals(
+                    403,
+                    json("POST", path, map("short_description", "Forbidden"), auth("agent"))
+                            .statusCode());
+            assertEquals(
+                    403,
+                    json(
+                                    "POST",
+                                    path,
+                                    map("short_description", "Forbidden", "state", "draft"),
+                                    auth("agent"))
+                            .statusCode());
+            assertEquals(
+                    201,
+                    json("POST", path, map("short_description", "Allowed"), auth("admin"))
+                            .statusCode());
+            try (var db = store.open()) {
+                assertEquals(
+                        1, db.count("SELECT COUNT(*) FROM os_record WHERE \"table\"=?", a.table));
+                assertEquals(1, db.count("SELECT COUNT(*) FROM os_event"));
+            }
+        } finally {
+            a.cleanup();
+        }
+    }
+
+    @Test
     void typedAnalyticsUsesAllAuthorizedRows() throws Exception {
         var acceptance = new ConfigurationAcceptance(this);
         try {

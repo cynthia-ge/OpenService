@@ -163,3 +163,7 @@ Added streaming, exact-decimal reporting over complete authorized selections, wi
 ## PostgreSQL recovery tranche — 2026-11-14
 
 Added a disposable, reproducible backup/restore drill and recovery runbook. Rebuilt the final app image; restored into a new volume after stopping the source database; verified configuration, records, security events, metrics, attachment bytes, account credentials and private visibility. Bash pipeline-failure behavior, syntax and missing-image cleanup were checked. No production database or cloud deployment was accessed. Java production source is unchanged from the passing 405-test/100%-coverage analytics commit.
+
+## 14 November 2026 — ten paired OpenService / QA-QC cycles
+
+User-authorized sequential run; local commits only. Each cycle fixes its QA base to that cycle's starting HEAD and reviews all accumulated source, tests and documentation, including repairs. Exact counters and the review ledger are recorded in [paired cycles](paired-cycles-2026-11-14.md).

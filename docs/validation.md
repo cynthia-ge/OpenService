@@ -47,3 +47,7 @@ The Java 27 Docker image builds, starts as UID 10001 against a fresh PostgreSQL 
 Run `sh scripts/install-browser.sh` once, start Docker, set `JAVA_HOME` to Java 27, then `sh scripts/verify.sh`. Reports: `target/site/jacoco/jacoco.xml`, `target/surefire-reports/` and `target/browser-artifacts/`. `clean` removes stale coverage. The [iteration log](iteration-log.md) records QA scope and findings. These checks establish the documented subset; they do not prove vendor-instance conformance, production load capacity or enterprise readiness.
 
 Final container acceptance after the ten feature slices uses the rebuilt Java 27 image and a fresh PostgreSQL volume. It verifies UID 10001, readiness, versioned record creation/read, binary content type/bytes, attachment ordering, suffix aggregates, omitted count headers, record/attachment persistence after application replacement, and audited attachment deletion. The task-owned containers, network and volume were removed. One historical regression fixture was explicitly updated from rejecting ORDERBYfile_name to asserting an empty successful result; the 113-case suite was retained, alongside new populated ordering tests.
+
+## Paired-cycle validation — 14 November 2026
+
+Cycle 1: 407 tests pass; exact whole-project Java coverage 2,428/2,428 lines, 1,298/1,298 branches, 157/157 methods. See [per-cycle scope, QA rounds and subsequent results](paired-cycles-2026-11-14.md).

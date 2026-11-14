@@ -104,6 +104,7 @@ public final class Service {
         if (payload.containsKey("state") && !payload.get("state").equals(data.get("state")))
             throw new Failure(400, "Create in the initial state, then use a transition");
         data.putAll(payload);
+        TypedFields.transition(definition, data.getOrDefault("state", ""), db.viewerRole);
         TypedFields.check(db, definition, data);
         String now = now();
         var item =
