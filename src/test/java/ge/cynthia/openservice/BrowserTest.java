@@ -48,6 +48,11 @@ class BrowserTest {
     }
 
     @Test
+    void connectedMigrationWizardUsesPersistedCheckpointsAndReviewedCutover() throws Exception {
+        TransferBrowserAcceptance.run(this);
+    }
+
+    @Test
     void assignmentHandoverRequiresFreshReviewAfterAnotherTabEditsWork() throws Exception {
         String table = "u_stale_" + id(),
                 name = "Source" + id().substring(0, 8),
@@ -109,7 +114,7 @@ class BrowserTest {
                                                     new Page.GetByRoleOptions()
                                                             .setName(
                                                                     "Transfer selected"
-                                                                        + " assignments"))
+                                                                            + " assignments"))
                                             .click());
             assertEquals(409, response.status());
             assertTrue(

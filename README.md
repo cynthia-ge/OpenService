@@ -1,6 +1,8 @@
 # OpenService
 
-A service operations foundation for Cynthia: clear workspaces, shared records, controlled workflows and a practical path from ServiceNow exports.
+A service operations foundation for Cynthia: clear workspaces, shared records, controlled workflows and guided, resumable migration from ServiceNow.
+
+OpenService is an independent project, not affiliated with, sponsored by or endorsed by ServiceNow. ServiceNow is a trademark of its respective owner. See [migration support and limits](docs/migration.md), [provenance evidence](docs/provenance.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 Development priorities and adoption gates are defined in the [roadmap and build order](docs/roadmap.md). Local identity, manual invitation/recovery and account lifecycle slices are implemented; scoped access, verified delivery and operational controls remain adoption prerequisites. The current build supports a disposable local walkthrough with synthetic data; shared evaluation and operational pilot gates remain unmet.
 
@@ -93,6 +95,8 @@ See [API scope](docs/api.md), [migration guide](docs/migration.md), [architectur
 sh scripts/install-browser.sh
 sh scripts/verify.sh
 ```
+
+The full gate also requires Node.js 24 for the development-only Chromium coverage converter. Java and Spring Boot remain the application runtime; Node.js is not included in the application image.
 
 The clean Maven build runs the API acceptance and workflow suites against both SQLite and a disposable PostgreSQL 17 Docker container, plus a Java Playwright Chromium journey at laptop, desktop and mobile sizes. It creates no records in an existing demo database. Docker must be running and Chromium installed; missing infrastructure fails the checks instead of skipping them.
 

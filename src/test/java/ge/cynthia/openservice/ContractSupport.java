@@ -36,6 +36,7 @@ abstract class ContractSupport {
         registry.add("SECRET_KEY", () -> "test-secret-key-for-disposable-evaluation");
         registry.add("ADMIN_PASSWORD", () -> "test-only-password-long");
         registry.add("COOKIE_SECURE", () -> "false");
+        registry.add("MIGRATION_ALLOWED_ORIGINS", MigrationSource::origin);
     }
 
     @TestFactory

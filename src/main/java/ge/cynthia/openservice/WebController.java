@@ -256,6 +256,88 @@ public class WebController {
                         200);
             }
         }
+        if (path.equals("/static/migrations.js")) {
+            method(method, "GET");
+            try (var input = WebController.class.getResourceAsStream("/static/migrations.js")) {
+                return binary(
+                        Objects.requireNonNull(input).readAllBytes(),
+                        "text/javascript; charset=utf-8",
+                        200);
+            }
+        }
+        if (path.equals("/admin/migrations")) {
+            method(method, "GET");
+            c.admin();
+            c.noQuery();
+            return view(c, "transfers", map("table", "migration"));
+        }
+        if (path.equals("/api/openservice/migrations")) {
+            c.admin();
+            c.noQuery();
+            method(method, "GET", "POST");
+            return json(
+                    map(
+                            "result",
+                            method.equals("GET")
+                                    ? TransferJobs.list(c.db)
+                                    : TransferJobs.create(
+                                            c.db, body(c), c.db.viewerId, store.migrationOrigins)),
+                    method.equals("GET") ? 200 : 201);
+        }
+        Matcher transfer =
+                Pattern.compile(
+                                "/api/openservice/migrations/([a-f0-9]{32})(?:/(step|preview|apply|sync|cutover|archive))?")
+                        .matcher(path);
+        if (transfer.matches()) {
+            c.admin();
+            String job = transfer.group(1), action = Objects.toString(transfer.group(2), "");
+            if (action.equals("archive")) {
+                method(method, "GET");
+                if (!Set.of("table", "after").containsAll(c.arguments().keySet()))
+                    throw new Failure(400, "Use table and after only");
+                var definition = object(TransferJobs.job(c.db, job).get("definition"));
+                String table = c.parameter("table", ""), cursor = c.parameter("after", "");
+                if (!TransferJobs.phases(definition).contains(table)
+                        || !cursor.matches("(?:[a-f0-9]{32})?"))
+                    throw new Failure(400, "Choose a staged table and valid cursor");
+                return json(
+                        map(
+                                "result",
+                                c.db.all(
+                                        "SELECT source_id,data FROM os_transfer_item WHERE job_id=?"
+                                            + " AND source_table=? AND source_id>? ORDER BY"
+                                            + " source_id LIMIT 100",
+                                        job,
+                                        table,
+                                        cursor)),
+                        200);
+            }
+            c.noQuery();
+            if (action.isEmpty()) {
+                method(method, "GET");
+                return json(map("result", TransferJobs.describe(c.db, job)), 200);
+            }
+            method(method, "POST");
+            Object input = body(c);
+            if (!action.equals("cutover") && !object(input).isEmpty())
+                throw new Failure(400, "This action takes an empty object");
+            Object result =
+                    switch (action) {
+                        case "step" ->
+                                TransferJobs.step(
+                                        c.db,
+                                        job,
+                                        Objects.toString(c.http.getHeader("X-Source-Token"), ""),
+                                        store.migrationOrigins);
+                        case "preview" -> TransferApply.apply(c.db, job, c.db.viewerId, true);
+                        case "apply" -> TransferApply.apply(c.db, job, c.db.viewerId, false);
+                        case "sync" ->
+                                TransferJobs.synchronize(
+                                        c.db, job, c.db.viewerId, store.migrationOrigins);
+                        default -> TransferJobs.cutover(c.db, job, input, c.db.viewerId);
+                    };
+            return json(map("result", result), 200);
+        }
         Matcher recovering = Pattern.compile("/recover/([A-Za-z0-9_-]{32})").matcher(path);
         if (recovering.matches()) {
             method(method, "GET", "POST");

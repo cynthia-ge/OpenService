@@ -4,7 +4,7 @@ import java.sql.SQLException;
 
 /** Ordered, transactional upgrades. The caller commits schema and bootstrap data together. */
 final class Migrations {
-    static final int VERSION = 12;
+    static final int VERSION = 13;
 
     private Migrations() {}
 
@@ -136,6 +136,27 @@ final class Migrations {
             db.update(
                     "INSERT INTO os_migration(version,name) VALUES(12,?)",
                     "authentication event journal");
+        }
+        if (version < 13) {
+            db.update(
+                    "CREATE TABLE IF NOT EXISTS os_transfer_job(job_id VARCHAR(32) PRIMARY"
+                        + " KEY,source_url VARCHAR(300) NOT NULL,creator_id VARCHAR(32) NOT"
+                        + " NULL,definition TEXT NOT NULL,detail TEXT NOT NULL,created VARCHAR(40)"
+                        + " NOT NULL)");
+            db.update(
+                    "CREATE TABLE IF NOT EXISTS os_transfer_item(job_id VARCHAR(32) NOT"
+                        + " NULL,source_table VARCHAR(80) NOT NULL,source_id VARCHAR(32) NOT"
+                        + " NULL,data TEXT NOT NULL,content "
+                            + (db.postgres ? "BYTEA" : "BLOB")
+                            + ",PRIMARY KEY(job_id,source_table,source_id))");
+            db.update(
+                    "CREATE TABLE IF NOT EXISTS os_transfer_link(source_url VARCHAR(300) NOT"
+                        + " NULL,source_table VARCHAR(80) NOT NULL,source_id VARCHAR(32) NOT"
+                        + " NULL,target_id VARCHAR(64) NOT NULL,detail TEXT NOT NULL,PRIMARY"
+                        + " KEY(source_url,source_table,source_id))");
+            db.update(
+                    "INSERT INTO os_migration(version,name) VALUES(13,?)",
+                    "resumable ServiceNow migrations");
         }
     }
 

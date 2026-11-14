@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{base :: layout(~{::main})}">
+<main id="migration-workspace" th:attr="data-csrf=${csrf}">
+<section class="page-heading"><div><span class="eyebrow">ADMINISTRATION · MIGRATION</span><h1>Connect, review, migrate.</h1><p>Bring selected records and supporting data from an authorized ServiceNow instance.</p></div></section>
+<div class="notice">Imported accounts start disabled; imported records are private. Source passwords are never copied. Source history is preserved in an administrator-only archive. Scripts, ACL logic and external integrations require separate review and implementation.</div>
+<div class="detail-grid"><section class="panel"><h2>1. Define the migration</h2>
+<p>Map destination fields to source fields. Values translate choices explicitly. Add a reviewed OpenService configuration bundle to install custom tables and workflow rules atomically. Keep credentials out of the plan.</p>
+<form id="migration-create" class="record-form"><label>Migration plan<textarea id="migration-plan" rows="18" required spellcheck="false">{
+  "source": "https://your-instance.service-now.com",
+  "tables": {
+    "incident": {
+      "target": "incident",
+      "fields": {"short_description": "short_description", "state": "state", "priority": "priority"},
+      "values": {}
+    }
+  },
+  "identities": false,
+  "roles": {},
+  "history": true,
+  "attachments": true
+}</textarea></label><button class="button primary">Create migration</button></form>
+</section><section class="panel"><h2>2. Resume and review</h2><label>Saved migration<select id="migration-jobs"></select></label><button id="migration-refresh" class="button">Refresh jobs</button>
+<label>Source OAuth bearer token<input id="migration-token" type="password" autocomplete="off"></label><p>Held only in this page's memory and sent with each fetch request. Supply it again after reopening the page.</p>
+<button id="migration-fetch" class="button primary">Fetch / resume</button><button id="migration-stop" class="button">Stop after this page</button>
+<button id="migration-preview" class="button">Validate destination preview</button><button id="migration-apply" class="button">Apply reviewed migration</button>
+<p id="migration-message" role="status" aria-live="polite"></p><pre id="migration-report"></pre><div id="migration-archives"></div>
+</section></div>
+<section class="panel"><h2>3. Synchronize and cut over</h2><p>Freeze source writes externally, run a final full synchronization, review its report and verify source completeness. Local changes or missing source records stop cutover. This records your cutover decision; it does not redirect traffic or reconfigure other systems.</p>
+<button id="migration-sync" class="button">Create final synchronization</button>
+<label><input id="migration-confirm" type="checkbox"> Source writes are frozen. I reviewed completeness, destination permissions and rebuilt automation.</label><button id="migration-cutover" class="button">Record cutover</button></section>
+<script src="/static/migrations.js" defer></script>
+</main></html>

@@ -1,0 +1,1 @@
+{"name":"openservice-browser-coverage","private":true,"version":"1.0.0","description":"Development-only conversion of Chromium V8 coverage","dependencies":{"v8-to-istanbul":"9.3.0"}}

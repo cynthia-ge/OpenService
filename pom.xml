@@ -56,6 +56,18 @@
     </dependency>
   </dependencies>
   <build>
+    <resources>
+      <resource><directory>src/main/resources</directory></resource>
+      <resource>
+        <directory>.</directory>
+        <targetPath>META-INF/openservice</targetPath>
+        <includes>
+          <include>LICENSE</include><include>THIRD_PARTY_NOTICES.md</include>
+          <include>licenses/**</include><include>docs/runtime-licenses.json</include>
+          <include>docs/provenance.md</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

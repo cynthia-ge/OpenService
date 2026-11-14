@@ -167,3 +167,9 @@ Added a disposable, reproducible backup/restore drill and recovery runbook. Rebu
 ## 14 November 2026 — ten paired OpenService / QA-QC cycles
 
 User-authorized sequential run; local commits only. Each cycle fixes its QA base to that cycle's starting HEAD and reviews all accumulated source, tests and documentation, including repairs. Exact counters and the review ledger are recorded in [paired cycles](paired-cycles-2026-11-14.md).
+
+## Connected migration tranche — 2026-11-14
+
+OS-046 adds a guided source connection, private checkpointed staging, explicit identity/role and field/configuration mappings, binary attachments, administrator-only history archives, atomic promotion, rescan synchronization and cutover verification. Full permission/script/integration translation and live-source qualification remain partial roadmap items.
+
+QA repaired stale-job overwrite risk, cross-scope membership/attachment references, browser error detail, legacy-upgrade replay and malformed metadata handling. Final review found no further defects in the fixed `0f53ddf` scope. Final gate: 441 tests; Java 3229/3229 lines, 1743/1743 branches and 196/196 methods; browser script 75/75 lines, 49/49 branches and 12/12 functions. Docker build, restart persistence, administrator/anonymous access boundaries, UID 10001 and packaged notice/inventory checks passed. [Detailed evidence](validation.md) records reproducible commands, repaired harness assumptions and limits.

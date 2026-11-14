@@ -45,3 +45,6 @@ target/
 
 # SQLite write-ahead logs and journals
 *.db-*
+
+# Development-only browser coverage dependencies
+node_modules/

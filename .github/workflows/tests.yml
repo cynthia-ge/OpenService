@@ -13,4 +13,7 @@ jobs:
           java-version: '27.0.1.0.2+1'
           cache: maven
       - run: ./mvnw -B test-compile exec:java -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.classpathScope=test -Dexec.args="install --with-deps chromium"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - run: sh scripts/verify.sh

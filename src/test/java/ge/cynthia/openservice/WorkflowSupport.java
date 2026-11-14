@@ -39,10 +39,28 @@ abstract class WorkflowSupport {
                             "os_record_access",
                             "os_group_member",
                             "os_auth_attempt",
-                            "os_auth_event")) db.update("DELETE FROM " + table);
+                            "os_auth_event",
+                            "os_transfer_job",
+                            "os_transfer_item",
+                            "os_transfer_link")) db.update("DELETE FROM " + table);
             db.update("DELETE FROM os_user WHERE name<>?", "admin");
             db.connection.commit();
         }
+    }
+
+    @Test
+    void connectedMigrationStagingEnforcesCumulativeLimits() throws Exception {
+        TransferLimitAcceptance.run(this);
+    }
+
+    @Test
+    void connectedMigrationValidationIsAtomicAndExplicit() throws Exception {
+        TransferValidationAcceptance.run(this);
+    }
+
+    @Test
+    void connectedMigrationsAreResumablePrivateAndConflictChecked() throws Exception {
+        TransferAcceptance.run(this);
     }
 
     @Test
