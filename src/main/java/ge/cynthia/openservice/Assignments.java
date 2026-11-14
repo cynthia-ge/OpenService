@@ -15,7 +15,7 @@ final class Assignments {
         Service.requireAccountAdministrator(db, actor);
         Service.account(db, user);
         var value = object(input);
-        if (!value.keySet().equals(Set.of("new_owner_id", "record_ids"))
+        if (!Set.of("new_owner_id", "record_ids", "expected_revisions").containsAll(value.keySet())
                 || !(value.get("new_owner_id") instanceof String next)
                 || !next.matches("[0-9a-f]{32}")
                 || next.equals(user)
@@ -23,6 +23,18 @@ final class Assignments {
             throw new Failure(400, "Provide a different new_owner_id and record_ids list");
         if (ids.isEmpty() || ids.size() > 100 || new HashSet<>(ids).size() != ids.size())
             throw new Failure(400, "Select 1–100 unique records");
+        Map<String, Object> expected = null;
+        if (value.containsKey("expected_revisions")) {
+            expected = object(value.get("expected_revisions"));
+            if (!expected.keySet().equals(new HashSet<>(ids)))
+                throw new Failure(400, "Provide one expected revision for every selected record");
+            for (Object token : expected.values())
+                if (!(token instanceof String revision) || !revision.matches("0|[1-9][0-9]{0,18}"))
+                    throw new Failure(
+                            400,
+                            "Expected revisions must be canonical nonnegative decimal strings");
+        }
+        var reviewed = new LinkedHashMap<String, Object>();
         if (db.one(
                         "SELECT user_id FROM os_user WHERE user_id=? AND active=1 AND role IN"
                                 + " ('admin','agent')",
@@ -41,6 +53,7 @@ final class Assignments {
             if (assignment.isEmpty()
                     || !user.equals(object(item.get("data")).get(assignment.get("user_field"))))
                 throw new Failure(409, "Selected record is no longer assigned to this account");
+            reviewed.put(recordId, item.get("revision").toString());
             Service.update(
                     db,
                     table,
@@ -48,7 +61,9 @@ final class Assignments {
                     map(assignment.get("user_field").toString(), next),
                     name,
                     "admin",
-                    item.get("revision").toString());
+                    expected == null
+                            ? item.get("revision").toString()
+                            : expected.get(recordId).toString());
         }
         var result =
                 map(
@@ -59,7 +74,9 @@ final class Assignments {
                         "new_owner_id",
                         next,
                         "dry_run",
-                        dryRun);
+                        dryRun,
+                        "expected_revisions",
+                        reviewed);
         SecurityEvents.record(db, actor, user, "account.assignments_transferred", result);
         if (dryRun) db.connection.rollback(checkpoint);
         db.connection.releaseSavepoint(checkpoint);
@@ -95,7 +112,7 @@ final class Assignments {
         var records = new ArrayList<Map<String, Object>>();
         for (var row :
                 db.all(
-                        "SELECT sys_id,\"table\",data FROM os_record WHERE "
+                        "SELECT sys_id,\"table\",data,revision FROM os_record WHERE "
                                 + where
                                 + " ORDER BY \"table\",sys_id LIMIT 25 OFFSET ?",
                         parameters.toArray())) {
@@ -109,7 +126,9 @@ final class Assignments {
                             "number",
                             data.get("number"),
                             "summary",
-                            data.get("short_description")));
+                            data.get("short_description"),
+                            "revision",
+                            row.get("revision").toString()));
         }
         return map(
                 "account", account, "records", records, "page", page, "pages", pages, "total",

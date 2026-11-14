@@ -67,3 +67,5 @@ Cycle 7: 426 passing tests; exact Java line/branch/method counts 2,561/2,561; 1,
 Cycle 8: 428 passing tests; exact Java line/branch/method counts 2,622/2,622; 1,426/1,426; 169/169.
 
 2026-11-14 paired cycle 9: `./mvnw clean verify` passes 428 tests, zero failures/errors/skips; exact JaCoCo LINE 2646/2646, BRANCH 1438/1438, METHOD 169/169. Explicit all-production-file coverage gate and `git diff --check` pass. Preview/apply browser journey and repeatable rollback on SQLite/PostgreSQL are covered. See [paired cycle evidence](paired-cycles-2026-11-14.md).
+
+2026-11-14 paired cycle 10: `./mvnw clean verify` passes 431 tests, zero failures/errors/skips; exact JaCoCo LINE 2662/2662, BRANCH 1452/1452, METHOD 169/169. Explicit all-production-file coverage gate and `git diff --check` pass. SQLite/PostgreSQL acceptance verifies stale-batch rollback and fresh apply; Chromium verifies conflicting edits from another tab. All ten paired cycles are complete; see [per-cycle evidence and limits](paired-cycles-2026-11-14.md).

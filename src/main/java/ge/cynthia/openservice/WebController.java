@@ -783,12 +783,18 @@ public class WebController {
                 if (!name.matches("[A-Za-z0-9]{1,80}"))
                     throw new Failure(400, "Choose an active account username");
                 String[] selected = c.http.getParameterValues("record_ids");
+                List<String> selections = selected == null ? List.of() : Arrays.asList(selected);
+                var revisions = new LinkedHashMap<String, Object>();
+                for (String selection : selections)
+                    revisions.put(selection, c.parameter("revision_" + selection, ""));
                 input =
                         map(
                                 "new_owner_id",
                                 RecordAccess.owner(c.db, name),
                                 "record_ids",
-                                selected == null ? List.of() : Arrays.asList(selected));
+                                selections,
+                                "expected_revisions",
+                                revisions);
             }
             var report =
                     Assignments.transfer(

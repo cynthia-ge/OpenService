@@ -88,7 +88,8 @@ final class AssignmentAcceptance {
             var records = objects(first.get("records"));
             assertEquals(25, records.size());
             assertEquals(
-                    Set.of("sys_id", "table", "number", "summary"), records.getFirst().keySet());
+                    Set.of("sys_id", "table", "number", "summary", "revision"),
+                    records.getFirst().keySet());
             var second =
                     objects(a.result(h.get(path + "?page=2", auth("admin")), 200).get("records"));
             assertEquals(5, second.size());

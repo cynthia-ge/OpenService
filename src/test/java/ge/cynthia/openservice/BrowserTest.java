@@ -48,6 +48,99 @@ class BrowserTest {
     }
 
     @Test
+    void assignmentHandoverRequiresFreshReviewAfterAnotherTabEditsWork() throws Exception {
+        String table = "u_stale_" + id(),
+                name = "Source" + id().substring(0, 8),
+                replacement = "Target" + id().substring(0, 8),
+                user,
+                first,
+                second;
+        try (var db = store.open()) {
+            for (String account : List.of(name, replacement))
+                Service.createAccount(
+                        db,
+                        map(
+                                "name",
+                                account,
+                                "role",
+                                "agent",
+                                "password",
+                                WorkflowSupport.PASSWORD));
+            user = RecordAccess.owner(db, name);
+            String group = AssignmentAcceptance.seed(db, table, user, 2);
+            GroupMembers.change(
+                    db,
+                    group,
+                    RecordAccess.owner(db, "admin"),
+                    map("user_id", RecordAccess.owner(db, replacement)),
+                    true);
+            var records = objects(Assignments.page(db, user, Map.of()).get("records"));
+            first = records.getFirst().get("sys_id").toString();
+            second = records.getLast().get("sys_id").toString();
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var context = browser.newContext()) {
+            var page = context.newPage();
+            login(page, "admin");
+            String directory = base() + "/admin/accounts/" + user + "/assignments";
+            page.navigate(directory);
+            page.locator("input[name=record_ids]").nth(0).check();
+            page.locator("input[name=record_ids]").nth(1).check();
+            page.getByLabel("Replacement username").fill(replacement);
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Preview handover"))
+                    .click();
+            assertEquals("0", page.locator("input[name=revision_" + second + "]").inputValue());
+            var editor = context.newPage();
+            editor.navigate(base() + "/record/" + table + "_b/" + second);
+            editor.locator("input[name=short_description]").fill("Edited from another tab");
+            editor.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Save changes"))
+                    .click();
+            assertEquals(
+                    "Edited from another tab",
+                    editor.locator("input[name=short_description]").inputValue());
+            var response =
+                    page.waitForResponse(
+                            r -> r.url().endsWith("/assignments/transfer"),
+                            () ->
+                                    page.getByRole(
+                                                    AriaRole.BUTTON,
+                                                    new Page.GetByRoleOptions()
+                                                            .setName(
+                                                                    "Transfer selected"
+                                                                        + " assignments"))
+                                            .click());
+            assertEquals(409, response.status());
+            assertTrue(
+                    page.locator("main")
+                            .innerText()
+                            .contains("Record changed; reload before saving"));
+            try (var db = store.open()) {
+                assertEquals(
+                        user, object(Service.record(db, table, first).get("data")).get("owner"));
+                assertEquals("0", Service.record(db, table, first).get("revision").toString());
+            }
+            page.navigate(directory);
+            assertEquals("1", page.locator("input[name=revision_" + second + "]").inputValue());
+            page.locator("input[name=record_ids]").nth(0).check();
+            page.locator("input[name=record_ids]").nth(1).check();
+            page.getByLabel("Replacement username").fill(replacement);
+            page.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Transfer selected assignments"))
+                    .click();
+            assertTrue(page.locator("main").innerText().contains("0 configured assignments"));
+        } finally {
+            try (var db = store.open()) {
+                db.update("DELETE FROM os_record WHERE \"table\" LIKE ?", table + "%");
+                db.update("DELETE FROM os_schema WHERE name LIKE ?", table + "%");
+                db.connection.commit();
+            }
+        }
+    }
+
+    @Test
     void administratorBrowsesInactiveAccountAssignments() throws Exception {
         String table = "u_assignment_" + id(),
                 name = "AssignedUser" + id().substring(0, 8),

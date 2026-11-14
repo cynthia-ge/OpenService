@@ -46,6 +46,11 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void assignmentHandoverRejectsStaleRevisionsAtomically() throws Exception {
+        AssignmentRevisionAcceptance.run(this);
+    }
+
+    @Test
     void selectedAssignmentHandoverIsAtomicAndPolicyChecked() throws Exception {
         AssignmentTransferAcceptance.run(this);
     }
