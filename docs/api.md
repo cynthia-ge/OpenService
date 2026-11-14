@@ -202,3 +202,11 @@ This reports mutation authorization. Workflow transitions, required/type checks,
 Administrators can open an account's **View assigned work** link or `GET /api/openservice/users/{user_id}/assignments?page=1`. The API returns `{result:{account,records,page,pages,total}}`; each record contains only `sys_id`, `table`, `number` and `summary`. Pages contain at most 25 rows, ordered by table then ID. `page` defaults to 1 and must be positive, at most six digits and within the result range (an empty list has one page). Other/duplicate query parameters fail with 400.
 
 The directory scans installed `assignment.user_field` metadata across tables and matches stable account IDs, including inactive assignees. Arbitrary legacy text fields and private-access ownership are not treated as work assignments. Other roles receive 403; missing users receive 404. Reads do not reactivate users, alter assignments or change record visibility.
+
+### Transfer selected assignments
+
+`POST /api/openservice/users/{source_id}/assignments/transfer` is administrator-only and accepts exactly `{"new_owner_id":"32-character account ID","record_ids":["record ID"]}`. Select 1–100 unique IDs. The source account may be inactive; the replacement must be a different active agent/administrator and belong to each selected record's configured assignment group. Every record must still be assigned to the source.
+
+The operation uses normal record-update validation and policies, increments record revisions, writes record audit events and one `account.assignments_transferred` security event. Any failure rolls back the entire batch. The 200 result reports `transferred_count`, `record_ids` and `new_owner_id`; malformed/ineligible input returns 400, policy denial 403, missing records/users 404, and changed/no-longer-assigned records 409. A repeated successful request therefore returns 409, not a second transfer.
+
+The account assignment page offers checkboxes and a replacement username with CSRF protection. No account is reactivated and no private/group visibility is changed; use the separate private-access handover when needed. No external notifications are sent.

@@ -752,6 +752,44 @@ public class WebController {
                     ? json(map("result", map("revoked", true)), 200)
                     : redirect("/admin/accounts/" + recoveryRevoke.group(1));
         }
+        Matcher transferAssignments =
+                Pattern.compile(
+                                "/(?:admin/accounts|api/openservice/users)/([0-9a-f]{32})/assignments/transfer")
+                        .matcher(path);
+        if (transferAssignments.matches()) {
+            method(method, "POST");
+            c.admin();
+            c.noQuery();
+            boolean api = path.startsWith("/api/");
+            Object input;
+            if (api) input = body(c);
+            else {
+                if (c.http.getParameterMap().entrySet().stream()
+                        .anyMatch(entry ->
+                                !entry.getKey().equals("record_ids")
+                                        && entry.getValue().length != 1))
+                    throw new Failure(400, "Repeated scalar form parameter");
+                String name = c.parameter("new_owner", "");
+                if (!name.matches("[A-Za-z0-9]{1,80}"))
+                    throw new Failure(400, "Choose an active account username");
+                String[] selected = c.http.getParameterValues("record_ids");
+                input =
+                        map(
+                                "new_owner_id",
+                                RecordAccess.owner(c.db, name),
+                                "record_ids",
+                                selected == null ? List.of() : Arrays.asList(selected));
+            }
+            var report =
+                    Assignments.transfer(
+                            c.db,
+                            c.user.get("user_id").toString(),
+                            transferAssignments.group(1),
+                            input);
+            return api
+                    ? json(map("result", report), 200)
+                    : redirect("/admin/accounts/" + transferAssignments.group(1) + "/assignments");
+        }
         Matcher assignments =
                 Pattern.compile(
                                 "/(?:admin/accounts|api/openservice/users)/([0-9a-f]{32})/assignments")

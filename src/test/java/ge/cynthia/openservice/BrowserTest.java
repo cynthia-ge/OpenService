@@ -49,12 +49,30 @@ class BrowserTest {
 
     @Test
     void administratorBrowsesInactiveAccountAssignments() throws Exception {
-        String table = "u_assignment_" + id(), name = "AssignedUser" + id().substring(0, 8), user;
+        String table = "u_assignment_" + id(),
+                name = "AssignedUser" + id().substring(0, 8),
+                replacement = "Replacement" + id().substring(0, 8),
+                user;
         try (var db = store.open()) {
             Service.createAccount(
                     db, map("name", name, "role", "agent", "password", WorkflowSupport.PASSWORD));
             user = RecordAccess.owner(db, name);
-            AssignmentAcceptance.seed(db, table, user, 26);
+            Service.createAccount(
+                    db,
+                    map(
+                            "name",
+                            replacement,
+                            "role",
+                            "agent",
+                            "password",
+                            WorkflowSupport.PASSWORD));
+            String group = AssignmentAcceptance.seed(db, table, user, 26);
+            GroupMembers.change(
+                    db,
+                    group,
+                    RecordAccess.owner(db, "admin"),
+                    map("user_id", RecordAccess.owner(db, replacement)),
+                    true);
             Service.changeActive(db, RecordAccess.owner(db, "admin"), user, map("active", false));
             db.connection.commit();
         }
@@ -75,6 +93,14 @@ class BrowserTest {
                             AriaRole.LINK,
                             new Page.GetByRoleOptions().setName("Previous assignments"))
                     .click();
+            page.locator("input[name=record_ids]").nth(0).check();
+            page.locator("input[name=record_ids]").nth(1).check();
+            page.getByLabel("Replacement username").fill(replacement);
+            page.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Transfer selected assignments"))
+                    .click();
+            assertTrue(page.locator("main").innerText().contains("24 configured assignments"));
             page.locator("tbody a").first().click();
             assertTrue(
                     page.locator("input[name=short_description]")

@@ -46,6 +46,11 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void selectedAssignmentHandoverIsAtomicAndPolicyChecked() throws Exception {
+        AssignmentTransferAcceptance.run(this);
+    }
+
+    @Test
     void administratorsCanFindAssignedWorkAcrossConfiguredTables() throws Exception {
         AssignmentAcceptance.run(this);
     }

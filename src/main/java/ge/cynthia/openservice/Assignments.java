@@ -9,6 +9,50 @@ import java.util.*;
 final class Assignments {
     private Assignments() {}
 
+    static Map<String, Object> transfer(Store.Db db, String actor, String user, Object input)
+            throws SQLException {
+        Service.requireAccountAdministrator(db, actor);
+        Service.account(db, user);
+        var value = object(input);
+        if (!value.keySet().equals(Set.of("new_owner_id", "record_ids"))
+                || !(value.get("new_owner_id") instanceof String next)
+                || !next.matches("[0-9a-f]{32}")
+                || next.equals(user)
+                || !(value.get("record_ids") instanceof List<?> ids))
+            throw new Failure(400, "Provide a different new_owner_id and record_ids list");
+        if (ids.isEmpty() || ids.size() > 100 || new HashSet<>(ids).size() != ids.size())
+            throw new Failure(400, "Select 1–100 unique records");
+        if (db.one(
+                        "SELECT user_id FROM os_user WHERE user_id=? AND active=1 AND role IN"
+                            + " ('admin','agent')",
+                        next)
+                == null) throw new Failure(400, "Choose an active agent or administrator");
+        String name = Service.account(db, actor).get("name").toString();
+        for (Object id : ids) {
+            if (!(id instanceof String recordId) || !recordId.matches("[0-9a-f]{32}"))
+                throw new Failure(400, "Invalid record ID");
+            var row = db.one("SELECT \"table\" FROM os_record WHERE sys_id=?", recordId);
+            if (row == null) throw new Failure(404, "Record not found");
+            String table = row.get("table").toString();
+            var item = Service.record(db, table, recordId);
+            var assignment = object(Service.schema(db, table).getOrDefault("assignment", map()));
+            if (assignment.isEmpty()
+                    || !user.equals(object(item.get("data")).get(assignment.get("user_field"))))
+                throw new Failure(409, "Selected record is no longer assigned to this account");
+            Service.update(
+                    db,
+                    table,
+                    item,
+                    map(assignment.get("user_field").toString(), next),
+                    name,
+                    "admin",
+                    item.get("revision").toString());
+        }
+        var result = map("transferred_count", ids.size(), "record_ids", ids, "new_owner_id", next);
+        SecurityEvents.record(db, actor, user, "account.assignments_transferred", result);
+        return result;
+    }
+
     static Map<String, Object> page(Store.Db db, String user, Map<String, String> args)
             throws SQLException {
         var account = Service.account(db, user);
