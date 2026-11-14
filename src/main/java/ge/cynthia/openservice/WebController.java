@@ -759,11 +759,21 @@ public class WebController {
         if (transferAssignments.matches()) {
             method(method, "POST");
             c.admin();
-            c.noQuery();
             boolean api = path.startsWith("/api/");
             Object input;
-            if (api) input = body(c);
-            else {
+            boolean dryRun;
+            if (api) {
+                if (!Set.of("dry_run").containsAll(c.arguments().keySet())
+                        || !Set.of("true", "false").contains(c.parameter("dry_run", "false")))
+                    throw new Failure(400, "Use dry_run=true or false");
+                dryRun = c.parameter("dry_run", "false").equals("true");
+                input = body(c);
+            } else {
+                c.noQuery();
+                String operation = c.parameter("operation", "transfer");
+                if (!Set.of("preview", "transfer").contains(operation))
+                    throw new Failure(400, "Choose preview or transfer");
+                dryRun = operation.equals("preview");
                 if (c.http.getParameterMap().entrySet().stream()
                         .anyMatch(entry ->
                                 !entry.getKey().equals("record_ids")
@@ -785,7 +795,24 @@ public class WebController {
                             c.db,
                             c.user.get("user_id").toString(),
                             transferAssignments.group(1),
-                            input);
+                            input,
+                            dryRun);
+            if (!api && dryRun) {
+                var page =
+                        Assignments.page(
+                                c.db,
+                                transferAssignments.group(1),
+                                Map.of("page", c.parameter("page", "1")));
+                page.putAll(
+                        map(
+                                "table",
+                                "accounts",
+                                "preview",
+                                report,
+                                "newOwner",
+                                c.parameter("new_owner", "")));
+                return view(c, "assignments", page);
+            }
             return api
                     ? json(map("result", report), 200)
                     : redirect("/admin/accounts/" + transferAssignments.group(1) + "/assignments");

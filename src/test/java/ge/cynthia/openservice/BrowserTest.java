@@ -96,6 +96,15 @@ class BrowserTest {
             page.locator("input[name=record_ids]").nth(0).check();
             page.locator("input[name=record_ids]").nth(1).check();
             page.getByLabel("Replacement username").fill(replacement);
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Preview handover"))
+                    .click();
+            assertTrue(
+                    page.locator("main")
+                            .innerText()
+                            .contains("Preview passed. No assignments changed."));
+            assertTrue(page.locator("main").innerText().contains("26 configured assignments"));
+            assertEquals(2, page.locator("input[name=record_ids]:checked").count());
+            assertEquals(replacement, page.getByLabel("Replacement username").inputValue());
             page.getByRole(
                             AriaRole.BUTTON,
                             new Page.GetByRoleOptions().setName("Transfer selected assignments"))

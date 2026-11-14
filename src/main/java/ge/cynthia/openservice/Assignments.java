@@ -9,7 +9,8 @@ import java.util.*;
 final class Assignments {
     private Assignments() {}
 
-    static Map<String, Object> transfer(Store.Db db, String actor, String user, Object input)
+    static Map<String, Object> transfer(
+            Store.Db db, String actor, String user, Object input, boolean dryRun)
             throws SQLException {
         Service.requireAccountAdministrator(db, actor);
         Service.account(db, user);
@@ -24,9 +25,10 @@ final class Assignments {
             throw new Failure(400, "Select 1–100 unique records");
         if (db.one(
                         "SELECT user_id FROM os_user WHERE user_id=? AND active=1 AND role IN"
-                            + " ('admin','agent')",
+                                + " ('admin','agent')",
                         next)
                 == null) throw new Failure(400, "Choose an active agent or administrator");
+        var checkpoint = db.connection.setSavepoint();
         String name = Service.account(db, actor).get("name").toString();
         for (Object id : ids) {
             if (!(id instanceof String recordId) || !recordId.matches("[0-9a-f]{32}"))
@@ -48,8 +50,19 @@ final class Assignments {
                     "admin",
                     item.get("revision").toString());
         }
-        var result = map("transferred_count", ids.size(), "record_ids", ids, "new_owner_id", next);
+        var result =
+                map(
+                        "transferred_count",
+                        ids.size(),
+                        "record_ids",
+                        ids,
+                        "new_owner_id",
+                        next,
+                        "dry_run",
+                        dryRun);
         SecurityEvents.record(db, actor, user, "account.assignments_transferred", result);
+        if (dryRun) db.connection.rollback(checkpoint);
+        db.connection.releaseSavepoint(checkpoint);
         return result;
     }
 

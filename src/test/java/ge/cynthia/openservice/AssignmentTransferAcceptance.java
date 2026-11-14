@@ -153,7 +153,57 @@ final class AssignmentTransferAcceptance {
                                     "application/x-www-form-urlencoded",
                                     auth("admin"))
                             .statusCode());
-            var result = a.result(h.json("POST", path, good, auth("admin")), 200);
+            for (int i = 0; i < 2; i++) {
+                var preview =
+                        a.result(h.json("POST", path + "?dry_run=true", good, auth("admin")), 200);
+                assertEquals(true, preview.get("dry_run"));
+                assertEquals(2, preview.get("transferred_count"));
+                try (var db = h.store.open()) {
+                    var unchanged = Service.record(db, a.table, record);
+                    assertEquals(source, object(unchanged.get("data")).get("owner"));
+                    assertEquals("0", unchanged.get("revision").toString());
+                    assertEquals(
+                            0,
+                            db.count(
+                                    "SELECT COUNT(*) FROM os_event WHERE action='updated' AND"
+                                        + " record_id=?",
+                                    record));
+                    assertEquals(
+                            0,
+                            db.count(
+                                    "SELECT COUNT(*) FROM os_security_event WHERE"
+                                        + " action='account.assignments_transferred'"));
+                }
+            }
+            assertEquals(
+                    400, h.json("POST", path + "?dry_run=maybe", good, auth("admin")).statusCode());
+            assertEquals(
+                    400,
+                    h.json("POST", path + "?dry_run=true&dry_run=false", good, auth("admin"))
+                            .statusCode());
+            assertEquals(
+                    400,
+                    h.form(
+                                    ui,
+                                    map(
+                                            "new_owner",
+                                            "target",
+                                            "record_ids",
+                                            record,
+                                            "operation",
+                                            "bad"),
+                                    auth("admin"))
+                            .statusCode());
+            assertEquals(
+                    400,
+                    h.form(
+                                    ui + "?x=1",
+                                    map("new_owner", "target", "record_ids", record),
+                                    auth("admin"))
+                            .statusCode());
+            var result =
+                    a.result(h.json("POST", path + "?dry_run=false", good, auth("admin")), 200);
+            assertEquals(false, result.get("dry_run"));
             assertEquals(2, result.get("transferred_count"));
             assertEquals(List.of(record, second), result.get("record_ids"));
             assertEquals(target, result.get("new_owner_id"));
