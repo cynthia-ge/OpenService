@@ -48,7 +48,7 @@ final class Configuration {
                     throw new Failure(
                             409,
                             "Configuration version changed; export and reconcile before"
-                                + " installing");
+                                    + " installing");
                 require(
                         object(definition.get("fields"))
                                 .keySet()
@@ -146,7 +146,9 @@ final class Configuration {
             require(
                     TypedFields.TYPES.contains(rule.getOrDefault("type", "")),
                     "Unsupported field type");
-            var allowed = new HashSet<>(Set.of("type", "required", "max_length"));
+            var allowed = new HashSet<>(Set.of("type", "required", "max_length", "write_roles"));
+            if (rule.containsKey("write_roles"))
+                choices(rule.get("write_roles"), Set.of("admin", "agent"));
             switch (rule.get("type").toString()) {
                 case "choice" -> {
                     allowed.add("choices");

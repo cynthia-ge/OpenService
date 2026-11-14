@@ -69,7 +69,7 @@ final class TypedFields {
                         require(
                                 db.one(
                                                 "SELECT sys_id FROM os_record WHERE \"table\"=? AND"
-                                                    + " sys_id=? AND "
+                                                        + " sys_id=? AND "
                                                         + RecordAccess.filter(
                                                                 db, "os_record.sys_id", parameters),
                                                 parameters.toArray())
@@ -80,7 +80,7 @@ final class TypedFields {
                             require(
                                     db.one(
                                                     "SELECT user_id FROM os_user WHERE user_id=?"
-                                                        + " AND active=1",
+                                                            + " AND active=1",
                                                     value)
                                             != null,
                                     field + " requires an active account ID");
@@ -100,14 +100,14 @@ final class TypedFields {
                 require(
                         db.one(
                                         "SELECT user_id FROM os_user WHERE user_id=? AND active=1"
-                                            + " AND role IN ('agent','admin')",
+                                                + " AND role IN ('agent','admin')",
                                         user)
                                 != null,
                         "Assignment requires an active agent or administrator");
                 require(
                         db.one(
                                         "SELECT user_id FROM os_group_member WHERE user_id=? AND"
-                                            + " group_id=?",
+                                                + " group_id=?",
                                         user,
                                         group)
                                 != null,
@@ -122,6 +122,20 @@ final class TypedFields {
             require(
                     !data.getOrDefault(field, "").toString().isBlank(),
                     field + " is required in this state");
+    }
+
+    static void writing(
+            Map<String, Object> definition,
+            Map<String, Object> before,
+            Map<String, Object> payload,
+            String role) {
+        for (var field : payload.entrySet()) {
+            var rule = object(rules(definition).getOrDefault(field.getKey(), map()));
+            if (!Objects.equals(field.getValue(), before.getOrDefault(field.getKey(), ""))
+                    && rule.containsKey("write_roles")
+                    && !((List<?>) rule.get("write_roles")).contains(role))
+                throw new Failure(403, "Your role cannot change " + field.getKey());
+        }
     }
 
     static void transition(Map<String, Object> definition, Object state, String role) {

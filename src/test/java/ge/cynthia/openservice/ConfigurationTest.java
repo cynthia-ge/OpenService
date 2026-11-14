@@ -66,6 +66,15 @@ class ConfigurationTest {
         cases.put(
                 "unknown field rule",
                 d -> object(d.get("field_rules")).put("bad", map("type", "string")));
+        cases.put(
+                "invalid field roles",
+                d -> rules(d).put("quantity", map("type", "integer", "write_roles", "admin")));
+        cases.put(
+                "unknown field role",
+                d ->
+                        rules(d).put(
+                                        "quantity",
+                                        map("type", "integer", "write_roles", List.of("root"))));
         cases.put("unsupported type", d -> rules(d).put("quantity", map("type", "script")));
         cases.put("null type", d -> rules(d).put("quantity", map("type", null)));
         cases.put(

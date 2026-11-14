@@ -59,11 +59,13 @@ class BrowserTest {
                             AriaRole.LINK,
                             new Page.GetByRoleOptions().setName("Configuration").setExact(true))
                     .click();
+            var definition = ConfigurationAcceptance.definition();
+            object(object(definition.get("field_rules")).get("quantity"))
+                    .put("write_roles", List.of("admin"));
             page.getByLabel("Configuration package JSON")
                     .fill(
                             JSON.writeValueAsString(
-                                    ConfigurationAcceptance.bundle(
-                                            table, ConfigurationAcceptance.definition())));
+                                    ConfigurationAcceptance.bundle(table, definition)));
             page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Preview package"))
                     .click();
             assertTrue(
@@ -89,6 +91,7 @@ class BrowserTest {
             assertEquals(
                     "Configured in browser",
                     page.locator("input[name=short_description]").inputValue());
+            String recordLocation = page.url();
             page.navigate(base() + "/workspace/" + table);
             page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName("Analytics ↗"))
                     .click();
@@ -102,6 +105,35 @@ class BrowserTest {
             assertEquals(
                     List.of("All matching records", "1", "1", "7", "7", "7", "7"),
                     cells.allTextContents());
+            String agentName = "FieldAgent" + id().substring(0, 8);
+            try (var db = store.open()) {
+                Service.createAccount(
+                        db,
+                        map(
+                                "name",
+                                agentName,
+                                "role",
+                                "agent",
+                                "password",
+                                WorkflowSupport.PASSWORD));
+                db.connection.commit();
+            }
+            try (var agentContext = browser.newContext()) {
+                var agent = agentContext.newPage();
+                login(agent, agentName);
+                agent.navigate(recordLocation);
+                assertNotNull(agent.locator("input[name=quantity]").getAttribute("readonly"));
+                agent.locator("input[name=short_description]").fill("Permitted field edit");
+                agent.getByRole(
+                                AriaRole.BUTTON,
+                                new Page.GetByRoleOptions().setName("Save changes →"))
+                        .click();
+                agent.reload();
+                assertEquals("7", agent.locator("input[name=quantity]").inputValue());
+                assertEquals(
+                        "Permitted field edit",
+                        agent.locator("input[name=short_description]").inputValue());
+            }
         } finally {
             try (var db = store.open()) {
                 db.update("DELETE FROM os_record WHERE \"table\"=?", table);

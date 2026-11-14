@@ -46,6 +46,11 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void fieldWritePoliciesCoverFormsApiAndImports() throws Exception {
+        FieldPolicyAcceptance.run(this);
+    }
+
+    @Test
     void sharedCommentsKeepRecordAndRoleBoundaries() throws Exception {
         CommentAcceptance.run(this);
     }

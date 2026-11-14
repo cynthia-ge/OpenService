@@ -15,7 +15,7 @@ public final class Service {
                     List.of(
                             "Reader",
                             "View records, activity and attachments; add shared comments. Cannot"
-                                + " change record fields."),
+                                    + " change record fields."),
                     "agent",
                     List.of(
                             "Agent",
@@ -104,6 +104,7 @@ public final class Service {
         if (data.containsKey("priority")) data.put("priority", "3");
         if (payload.containsKey("state") && !payload.get("state").equals(data.get("state")))
             throw new Failure(400, "Create in the initial state, then use a transition");
+        TypedFields.writing(definition, data, payload, db.viewerRole);
         data.putAll(payload);
         TypedFields.transition(definition, data.getOrDefault("state", ""), db.viewerRole);
         TypedFields.check(db, definition, data);
@@ -218,6 +219,7 @@ public final class Service {
                 throw new Failure(403, "An administrator must approve or reject changes");
             TypedFields.transition(definition, payload.get("state"), role);
         }
+        TypedFields.writing(definition, data, payload, role);
         var proposed = new LinkedHashMap<>(data);
         proposed.putAll(payload);
         TypedFields.check(db, definition, proposed);
@@ -602,6 +604,7 @@ public final class Service {
                     validate(definition, normalized);
                     if (normalized.get("short_description").toString().isBlank())
                         throw new Failure(400, "Summary is required");
+                    TypedFields.writing(definition, map(), normalized, db.viewerRole);
                     TypedFields.check(db, definition, normalized);
                 } catch (Failure invalid) {
                     errors.add(map("row", index, "message", invalid.getMessage()));
