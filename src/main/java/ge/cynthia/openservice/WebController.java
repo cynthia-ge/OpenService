@@ -546,6 +546,18 @@ public class WebController {
                                             revision))),
                     200);
         }
+        Matcher permissions =
+                Pattern.compile("/api/openservice/permissions/([^/]+)/([0-9a-f]{32})")
+                        .matcher(path);
+        if (permissions.matches()) {
+            method(method, "GET");
+            c.noQuery();
+            return json(
+                    map(
+                            "result",
+                            Permissions.inspect(c.db, permissions.group(1), permissions.group(2))),
+                    200);
+        }
         Matcher comments =
                 Pattern.compile("/api/openservice/comments/([^/]+)/([0-9a-f]{32})").matcher(path);
         if (comments.matches()) {

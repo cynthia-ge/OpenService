@@ -46,6 +46,11 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void permissionDiagnosticsMatchMutationPoliciesWithoutLeakingRecords() throws Exception {
+        PermissionAcceptance.run(this);
+    }
+
+    @Test
     void configuredRecordOperationsConstrainExistingRoles() throws Exception {
         RecordPolicyAcceptance.run(this);
     }
