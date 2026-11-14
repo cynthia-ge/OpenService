@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{base :: layout(~{::main})}">
+<main>
+  <a class="back-link" th:href="@{/workspace/{table}(table=${table})}" th:text="${'← '+definition.label}"></a>
+  <section class="page-heading"><div><span class="eyebrow">MEASURE YOUR WORK</span><h1 th:text="${definition.label+' analytics'}"></h1><p>Metrics include every matching record you can access. Empty values are excluded from numeric calculations.</p></div></section>
+  <section class="panel"><div class="panel-heading"><h2>Numeric metrics</h2></div>
+    <p th:if="${metricFields.isEmpty()}">No integer or decimal fields are configured for this record type.</p>
+    <th:block th:unless="${metricFields.isEmpty()}">
+      <form method="get" class="record-form"><div class="field-grid">
+        <div><label for="metric-field">Measure</label><select id="metric-field" name="field"><option th:each="field:${metricFields}" th:value="${field.key}" th:selected="${field.key==metric}" th:text="${field.value}"></option></select></div>
+        <div><label for="metric-group">Group by</label><select id="metric-group" name="group_by"><option value="">All matching records</option><option th:each="field:${definition.fields}" th:value="${field.key}" th:selected="${field.key==groupBy}" th:text="${field.value}"></option></select></div>
+        <label class="wide">Filter query<input name="q" th:value="${filter}" placeholder="category=service"><small>Use the same encoded field filters as the record API.</small></label>
+      </div><button class="button primary">Calculate metrics</button></form>
+      <div class="table-scroll"><table><thead><tr><th>Group</th><th>Records</th><th>Values</th><th>Sum</th><th>Minimum</th><th>Maximum</th><th>Average</th></tr></thead>
+        <tbody><tr th:each="row:${report.rows}"><td th:text="${groupBy.isEmpty() ? 'All matching records' : (row.group.isEmpty() ? '(empty)' : row.group)}"></td><td th:text="${row.count}"></td><td th:text="${row.value_count}"></td><td th:text="${row.sum}"></td><td th:text="${row.min ?: '—'}"></td><td th:text="${row.max ?: '—'}"></td><td th:text="${row.average ?: '—'}"></td></tr>
+        <tr th:if="${report.rows.isEmpty()}"><td colspan="7">No matching records.</td></tr></tbody></table></div>
+      <p>Sum, minimum and maximum retain decimal precision. Averages use up to 34 significant digits.</p>
+    </th:block>
+  </section>
+</main>
+</html>

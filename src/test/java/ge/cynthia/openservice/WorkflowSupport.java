@@ -46,6 +46,16 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void typedAnalyticsUsesAllAuthorizedRows() throws Exception {
+        var acceptance = new ConfigurationAcceptance(this);
+        try {
+            acceptance.analytics();
+        } finally {
+            acceptance.cleanup();
+        }
+    }
+
+    @Test
     void reusableServiceOperationsExampleAndQueuedWriteAuthorization() throws Exception {
         var acceptance = new ConfigurationAcceptance(this);
         try {

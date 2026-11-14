@@ -207,3 +207,7 @@ Implemented local ADOPT-05/06/09 slice: atomic administrative handover of live p
 Implemented bounded slices in OS-PARITY-01/02/09, with reusable case/asset/knowledge examples for OS-PARITY-04/05. [Contract and primary references](configuration.md). Existing API paths and legacy unversioned definitions retain their contracts. Configured tables enforce types and relationships through real entry points. Promotion uses destination revisions and validates affected persisted records atomically; no arbitrary code or vendor package execution is enabled.
 
 Remaining shortlist: typed metrics (OS-PARITY-07); durable delivery/connectors (03 and ADOPT-07); separate approvals/SLA timers (02); requester/field controls (08); discovery/impact (05); grounded, governed AI (06); operational restore and failover evidence (10). Whole-area statuses remain partial or missing. Exact validation results are recorded in validation.md.
+
+## Typed numeric reporting — 2026-11-14
+
+OS-PARITY-07 now includes complete-selection sum/minimum/maximum/average reports for configured integer/decimal fields, optional grouping and encoded filtering, record-level visibility enforcement and a browser workspace. [Contract and evidence](analytics.md). Results use exact decimal accumulation and documented DECIMAL128 averages. SQLite/PostgreSQL tests explicitly cover 10,001 rows and private records; there is no Table API pagination shortcut. This is a local API extension; native numeric Aggregate API compatibility, saved/time-series reports and process mining remain open.

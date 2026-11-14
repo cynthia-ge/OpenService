@@ -155,3 +155,7 @@ Ordering is limited to sys_id, file_name, table_name and table_sys_id. It does n
 ## Reusable configuration tranche — 2026-11-14
 
 Added original typed/schema configuration, reference and assignment integrity, state-entry policies, atomic versioned promotion and the administrator workspace. Bundled case/asset/knowledge definitions run through the same engines. Reviewed negative inputs, schema evolution, referential deletion, import validation, rollback, stale revisions and queued-write authorization. Full validation: 403 tests; 2359/2359 lines, 1262/1262 branches, 149/149 methods. See configuration.md and validation.md for contracts and limits.
+
+## Typed numeric analytics tranche — 2026-11-14
+
+Added streaming, exact-decimal reporting over complete authorized selections, with grouping/filtering and a browser workspace. Verified 10,001-row selection correctness, hidden-record exclusion, null/blank semantics and typed field restrictions on both databases. Corrected an ambiguous browser control label. Final suite: 405 tests; 2427/2427 lines, 1298/1298 branch outcomes, 157/157 methods. Native numeric Aggregate API conformance and process mining remain open.

@@ -543,6 +543,39 @@ public class WebController {
                                             revision))),
                     200);
         }
+        Matcher analytics =
+                Pattern.compile("/(api/openservice/analytics|analytics)/([^/]+)").matcher(path);
+        if (analytics.matches()) {
+            method(method, "GET");
+            c.uniqueQuery();
+            String table = analytics.group(2);
+            if (analytics.group(1).startsWith("api/"))
+                return json(map("result", Analytics.report(c.db, table, c.arguments())), 200);
+            var definition = Service.schema(c.db, table);
+            var fields = Analytics.fields(definition);
+            var args = new LinkedHashMap<>(c.arguments());
+            args.putIfAbsent("field", fields.isEmpty() ? "" : fields.keySet().iterator().next());
+            var report =
+                    fields.isEmpty() ? map("rows", List.of()) : Analytics.report(c.db, table, args);
+            return view(
+                    c,
+                    "analytics",
+                    map(
+                            "table",
+                            table,
+                            "definition",
+                            definition,
+                            "metricFields",
+                            fields,
+                            "metric",
+                            args.get("field"),
+                            "groupBy",
+                            c.parameter("group_by", ""),
+                            "filter",
+                            c.parameter("q", ""),
+                            "report",
+                            report));
+        }
         Matcher stats = Pattern.compile("/api/now/stats/([^/]+)").matcher(path);
         if (stats.matches()) {
             method(method, "GET");

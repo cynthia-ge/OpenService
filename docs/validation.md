@@ -1,3 +1,9 @@
+# Typed analytics verification — 14 November 2026
+
+Final `JAVA_HOME=<Temurin 27.0.1.0.2+1> ./mvnw clean verify`: **405 tests**, zero failures/errors/skips; whole-project **2427/2427 lines, 1298/1298 branch outcomes, 157/157 methods**. The exact-count skill gate passed all 22 production Java source files. No coverage exclusions or threshold changes were introduced. Templates are verified by Chromium journeys; Java coverage does not measure template or shell-script lines.
+
+The analytics regression exercises all 10,001 records on SQLite and PostgreSQL, exact decimals, negative/blank values, grouping/filtering, empty sets and private-record exclusion. The browser journey follows the workspace link, selects a numeric field and verifies all displayed statistics. Full prior application, configuration, migration and account acceptance also passed. The first browser check found an ambiguous select label; explicit label associations corrected it, and both the focused browser check and final suite passed.
+
 # Reusable configuration verification — 14 November 2026
 
 `JAVA_HOME=<Temurin 27.0.1.0.2+1> ./mvnw clean verify` passed **403 tests**, zero failures/errors/skips. Whole-project exact JaCoCo: **2359/2359 lines, 1262/1262 branch outcomes, 149/149 methods**. The skill's exact per-file gate passed every production Java source, without exclusions or threshold changes.

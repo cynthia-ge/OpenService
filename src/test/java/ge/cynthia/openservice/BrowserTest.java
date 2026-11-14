@@ -89,6 +89,19 @@ class BrowserTest {
             assertEquals(
                     "Configured in browser",
                     page.locator("input[name=short_description]").inputValue());
+            page.navigate(base() + "/workspace/" + table);
+            page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName("Analytics ↗"))
+                    .click();
+            page.getByLabel("Measure", new Page.GetByLabelOptions().setExact(true))
+                    .selectOption("quantity");
+            page.getByRole(
+                            AriaRole.BUTTON,
+                            new Page.GetByRoleOptions().setName("Calculate metrics"))
+                    .click();
+            var cells = page.locator("tbody tr").first().locator("td");
+            assertEquals(
+                    List.of("All matching records", "1", "1", "7", "7", "7", "7"),
+                    cells.allTextContents());
         } finally {
             try (var db = store.open()) {
                 db.update("DELETE FROM os_record WHERE \"table\"=?", table);

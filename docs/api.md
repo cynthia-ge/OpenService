@@ -176,3 +176,7 @@ Administrator-only POST `/api/openservice/users/{user_id}/private-records/transf
 ## Configuration packages
 
 Administrator `GET /api/openservice/configuration` exports current definitions and versions; `POST` previews by default, or atomically installs with `dry_run=false`. Definitions govern existing record API validation and workflows. See [the full configuration contract](configuration.md), including dependency checks, destination-version conflicts, typed string values, reference access, assignment eligibility and import limits.
+
+## Typed numeric reports
+
+Authenticated `GET /api/openservice/analytics/{table}?field=estimate` reports count, value count, sum, min, max and average over all authorized matching rows. Optional `group_by` and `q` select grouping and the existing encoded-query filter. See [analytics](analytics.md) for numeric precision, blanks, empty selections and limits.

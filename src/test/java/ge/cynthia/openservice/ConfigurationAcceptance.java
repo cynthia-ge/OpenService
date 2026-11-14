@@ -154,8 +154,8 @@ final class ConfigurationAcceptance {
                     gate.all("SELECT pg_stat_clear_snapshot()");
                     if (gate.count(
                                     "SELECT COUNT(*) FROM pg_stat_activity WHERE query='SELECT"
-                                        + " pg_advisory_xact_lock(18439,4)' AND"
-                                        + " wait_event_type='Lock'")
+                                            + " pg_advisory_xact_lock(18439,4)' AND"
+                                            + " wait_event_type='Lock'")
                             > 0) {
                         waiting = true;
                         break;
@@ -164,12 +164,212 @@ final class ConfigurationAcceptance {
                 }
                 gate.update(
                         "UPDATE os_user SET auth_revision=auth_revision+1 WHERE"
-                            + " name='QueuedWriter'");
+                                + " name='QueuedWriter'");
                 gate.connection.commit();
                 assertTrue(waiting, "Mutation must wait for the shared write lock");
                 assertEquals(401, request.get(15, TimeUnit.SECONDS).statusCode());
             }
         }
+    }
+
+    void analytics() throws Exception {
+        assertEquals(200, install(bundle(table, definition()), false).statusCode());
+        h.account("MetricReader", "reader");
+        create(
+                table,
+                map(
+                        "short_description",
+                        "First",
+                        "amount",
+                        "0.1",
+                        "quantity",
+                        "2",
+                        "category",
+                        "service"),
+                "admin");
+        create(
+                table,
+                map(
+                        "short_description",
+                        "Second",
+                        "amount",
+                        "0.2",
+                        "quantity",
+                        "3",
+                        "category",
+                        "service"),
+                "admin");
+        create(
+                table,
+                map(
+                        "short_description",
+                        "Third",
+                        "amount",
+                        "-0.1",
+                        "quantity",
+                        "-1",
+                        "category",
+                        "access"),
+                "admin");
+        create(
+                table,
+                map("short_description", "Blank", "amount", " ", "category", "access"),
+                "admin");
+        var hidden = create(table, map("short_description", "Hidden", "amount", "900"), "admin");
+        String admin;
+        try (var db = h.store.open()) {
+            admin = RecordAccess.owner(db, "admin");
+        }
+        assertStatus(
+                200,
+                "PATCH",
+                "/api/openservice/access/" + table + "/" + hidden.get("sys_id"),
+                map("visibility", "private", "owner_id", admin),
+                "admin");
+        String path = "/api/openservice/analytics/" + table;
+        var report = result(h.get(path + "?field=amount", auth("MetricReader")), 200);
+        var row = objects(report.get("rows")).getFirst();
+        assertEquals("4", row.get("count"));
+        assertEquals("3", row.get("value_count"));
+        assertEquals("0.2", row.get("sum"));
+        assertEquals("-0.1", row.get("min"));
+        assertEquals("0.2", row.get("max"));
+        assertEquals("0.0" + "6".repeat(33) + "7", row.get("average"));
+        var grouped =
+                objects(
+                        result(
+                                        h.get(
+                                                path + "?field=amount&group_by=category",
+                                                auth("MetricReader")),
+                                        200)
+                                .get("rows"));
+        assertEquals(
+                List.of("access", "service"), grouped.stream().map(v -> v.get("group")).toList());
+        assertEquals("0.3", grouped.getLast().get("sum"));
+        assertEquals("0.15", grouped.getLast().get("average"));
+        assertEquals(
+                "900.2",
+                objects(result(h.get(path + "?field=amount", auth("admin")), 200).get("rows"))
+                        .getFirst()
+                        .get("sum"));
+        var empty =
+                objects(
+                                result(
+                                                h.get(
+                                                        path
+                                                                + "?field=amount&q=short_description%3Dmissing",
+                                                        auth("admin")),
+                                                200)
+                                        .get("rows"))
+                        .getFirst();
+        assertEquals(
+                map(
+                        "group",
+                        "",
+                        "count",
+                        "0",
+                        "value_count",
+                        "0",
+                        "sum",
+                        "0",
+                        "min",
+                        null,
+                        "max",
+                        null,
+                        "average",
+                        null),
+                empty);
+        assertEquals(
+                List.of(),
+                result(
+                                h.get(
+                                        path
+                                                + "?field=amount&group_by=category&q=short_description%3Dmissing",
+                                        auth("admin")),
+                                200)
+                        .get("rows"));
+        assertEquals(
+                "4",
+                objects(
+                                result(h.get(path + "?field=quantity", auth("MetricReader")), 200)
+                                        .get("rows"))
+                        .getFirst()
+                        .get("sum"));
+        for (String query :
+                List.of(
+                        "",
+                        "?field=short_description",
+                        "?field=amount&group_by=missing",
+                        "?field=amount&x=1",
+                        "?field=amount&field=quantity",
+                        "?field=amount&q=unknown%3Dx"))
+            assertEquals(400, h.get(path + query, auth("admin")).statusCode(), query);
+        assertEquals(401, h.get(path + "?field=amount", null).statusCode());
+        assertStatus(405, "POST", path, map(), "admin");
+        assertEquals(
+                404,
+                h.get("/api/openservice/analytics/unknown?field=amount", auth("admin"))
+                        .statusCode());
+        assertTrue(
+                html(h.get("/analytics/incident", auth("MetricReader")))
+                        .contains("No integer or decimal fields"));
+        assertEquals(200, h.get("/analytics/" + table, auth("MetricReader")).statusCode());
+        assertEquals(
+                200,
+                h.get(
+                                "/analytics/" + table + "?field=quantity&group_by=category",
+                                auth("MetricReader"))
+                        .statusCode());
+        assertEquals(
+                400,
+                h.get("/analytics/" + table + "?field=quantity&field=amount", auth("admin"))
+                        .statusCode());
+        // All 10,001 persisted rows participate; this must not reuse a capped Table API page.
+        try (var db = h.store.open()) {
+            db.update("DELETE FROM os_record WHERE \"table\"=?", table);
+            try (var statement =
+                    db.statement(
+                            "INSERT INTO"
+                                + " os_record(sys_id,\"table\",data,original,created,updated,creator,updater,revision)"
+                                + " VALUES(?,?,"
+                                    + db.jsonParameter()
+                                    + ","
+                                    + db.jsonParameter()
+                                    + ",?,?,?,?,?)")) {
+                for (int i = 0; i < 10001; i++) {
+                    Object[] values = {
+                        id(),
+                        table,
+                        JSON.writeValueAsString(
+                                map(
+                                        "short_description",
+                                        "Bulk",
+                                        "amount",
+                                        "0.01",
+                                        "quantity",
+                                        "1")),
+                        "{}",
+                        now(),
+                        now(),
+                        "admin",
+                        "admin",
+                        0
+                    };
+                    for (int p = 0; p < values.length; p++) statement.setObject(p + 1, values[p]);
+                    statement.addBatch();
+                }
+                statement.executeBatch();
+            }
+            db.connection.commit();
+        }
+        var all =
+                objects(
+                                result(h.get(path + "?field=amount", auth("MetricReader")), 200)
+                                        .get("rows"))
+                        .getFirst();
+        assertEquals("10001", all.get("count"));
+        assertEquals("100.01", all.get("sum"));
+        assertEquals("0.01", all.get("average"));
     }
 
     static Map<String, Object> bundle(String table, Map<String, Object> definition) {
