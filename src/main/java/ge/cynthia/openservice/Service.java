@@ -104,6 +104,7 @@ public final class Service {
         if (payload.containsKey("state") && !payload.get("state").equals(data.get("state")))
             throw new Failure(400, "Create in the initial state, then use a transition");
         data.putAll(payload);
+        TypedFields.check(db, definition, data);
         String now = now();
         var item =
                 map(
@@ -213,7 +214,11 @@ public final class Service {
                     && List.of("approved", "rejected").contains(payload.get("state"))
                     && !role.equals("admin"))
                 throw new Failure(403, "An administrator must approve or reject changes");
+            TypedFields.transition(definition, payload.get("state"), role);
         }
+        var proposed = new LinkedHashMap<>(data);
+        proposed.putAll(payload);
+        TypedFields.check(db, definition, proposed);
         var before = serialize(item);
         data.putAll(payload);
         item.putAll(
@@ -231,6 +236,7 @@ public final class Service {
 
     public static void remove(Store.Db db, Map<String, Object> item, String actor)
             throws SQLException {
+        TypedFields.deleting(db, item);
         audit(db, item, actor, "deleted", map("before", serialize(item)));
         db.update("DELETE FROM os_attachment WHERE record_id=?", item.get("sys_id"));
         db.update("DELETE FROM os_group_member WHERE group_id=?", item.get("sys_id"));
@@ -588,6 +594,17 @@ public final class Service {
                 if (field instanceof Map<?, ?> reference)
                     field = reference.getOrDefault("value", null);
                 normalized.put(key, field == null ? "" : sourceText(field));
+            }
+            if (definition.containsKey("version")) {
+                try {
+                    validate(definition, normalized);
+                    if (normalized.get("short_description").toString().isBlank())
+                        throw new Failure(400, "Summary is required");
+                    TypedFields.check(db, definition, normalized);
+                } catch (Failure invalid) {
+                    errors.add(map("row", index, "message", invalid.getMessage()));
+                    continue;
+                }
             }
             normalized.put(
                     "number",

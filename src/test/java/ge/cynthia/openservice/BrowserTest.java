@@ -48,6 +48,57 @@ class BrowserTest {
     }
 
     @Test
+    void administratorPreviewsInstallsAndUsesAReusableTypedApplication() throws Exception {
+        String table = "u_browser_" + id();
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var context = browser.newContext()) {
+            var page = context.newPage();
+            login(page, "admin");
+            page.getByRole(
+                            AriaRole.LINK,
+                            new Page.GetByRoleOptions().setName("Configuration").setExact(true))
+                    .click();
+            page.getByLabel("Configuration package JSON")
+                    .fill(
+                            JSON.writeValueAsString(
+                                    ConfigurationAcceptance.bundle(
+                                            table, ConfigurationAcceptance.definition())));
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Preview package"))
+                    .click();
+            assertTrue(
+                    page.locator("main").innerText().contains("Preview passed. No changes saved."));
+            try (var db = store.open()) {
+                assertNull(db.one("SELECT name FROM os_schema WHERE name=?", table));
+            }
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Install package"))
+                    .click();
+            assertTrue(page.locator("main").innerText().contains("Configuration installed."));
+            page.navigate(base() + "/record/" + table + "/new");
+            page.locator("input[name=short_description]").fill("Configured in browser");
+            page.locator("input[name=quantity]").fill("not a number");
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Create record →"))
+                    .click();
+            assertTrue(page.locator("main").innerText().contains("invalid integer"));
+            page.goBack();
+            page.locator("input[name=quantity]").fill("7");
+            page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName("Create record →"))
+                    .click();
+            assertEquals("7", page.locator("input[name=quantity]").inputValue());
+            page.reload();
+            assertEquals(
+                    "Configured in browser",
+                    page.locator("input[name=short_description]").inputValue());
+        } finally {
+            try (var db = store.open()) {
+                db.update("DELETE FROM os_record WHERE \"table\"=?", table);
+                db.update("DELETE FROM os_schema WHERE name=?", table);
+                db.connection.commit();
+            }
+        }
+    }
+
+    @Test
     void administratorHandsPrivateWorkToAnotherSignedInAccount() throws Exception {
         String suffix = id().substring(0, 8),
                 oldName = "OldBrowser" + suffix,

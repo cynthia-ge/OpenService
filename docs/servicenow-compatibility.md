@@ -7,18 +7,18 @@ Target: a bounded subset of the **Australia Table API documentation**, accessed 
 | ID | Inventory | Capability | Status and boundary |
 |---|---|---|---|
 | OS-001 | A4(a) | Table CRUD and JSON envelopes | Implemented subset: seven configured tables, unversioned and v1/v2 routes, bounded parameters. API details in `api.md`. |
-| OS-002 | A1 | Shared schema and persistence | Partial: registry drives validation and forms. No native sys_db_object/sys_dictionary CRUD, table inheritance or typed reference resolution. |
+| OS-002 | A1 | Shared schema and persistence | Partial: configurable registry drives typed validation, forms, references and assignment checks; see configuration.md. No native sys_db_object/sys_dictionary CRUD, table inheritance or reference display-value resolution. |
 | OS-003 | A2 | Workspaces, forms, lists | Implemented original UI: overview, record forms, search, paging, dictionary, history and migration. No native UI16/g_form compatibility. |
 | OS-004 | A4(d) | Encoded queries | Partial: equality, inequality, contains/not-contains, starts-with, ends-with, IN/NOT IN, empty/not-empty, AND and ordering; database filtering. No full grammar or scripting. |
 | OS-005 | A2/A4(e) | Identity and access | Partial: local admin/agent/reader, administrator account-onboarding workspace, Basic and session auth, CSRF. No invites/email verification, account editing/reset/deactivation, OAuth/SSO, field ACLs or domain separation. |
-| OS-006 | A3 | Incident/change/request/problem workflows | Partial: local state machines, approval by admin, revision checks. Not verified vendor state/BR semantics. |
+| OS-006 | A3 | Incident/change/request/problem workflows | Partial: reusable state machines, role-gated transitions, required fields per state and revision checks. No separate approval-request engine or verified vendor state/BR semantics. |
 | OS-007 | A1/A4(a) | Audit, journal and files | Partial: persistent record events, internal notes and attachments. Attachment upload/read/delete APIs; no native journal API or full activity semantics. |
 | OS-008 | Recommendations | Migration/import/export | Implemented bounded JSON/CSV path with dry-run, source retention, stable IDs and repeat-import skips. See migration limits. |
 | OS-009 | A3 | Configuration items/knowledge/groups | Partial: real CRUD workspaces; not full CMDB/IRE, knowledge publishing or group membership. |
 | OS-010 | Platform operations | Docker and multi-cloud infrastructure | Docker verified locally; AWS/GCP/Azure validated and mock-plan tested, not deployed. |
 | OS-011 | A1/A4(c) | Business rules and Glide runtime | Missing; prioritize a sandboxed, explicitly scoped implementation with source-backed semantics. |
 | OS-012 | A4(a) | Aggregate, native attachments, Import Set and Batch APIs | Partial: filtered/grouped count Aggregate API added; attachment upload/read/delete supported; numeric aggregates, attachment updates, Import Set and Batch remain missing. |
-| OS-013 | A1/A5 | Flow Designer, SLAs, catalog, update sets | Missing; no placeholder interfaces claim support. |
+| OS-013 | A1/A5 | Flow Designer, SLAs, catalog, update sets | Partial: local configuration packages and configurable workflow policies. Native Flow Designer, SLA timers, service catalogue and ServiceNow update-set compatibility remain missing. |
 | OS-014 | Enterprise operation | SSO, fine-grained ACLs, rate limits, workers, migrations | Partial: serialized versioned database upgrades; SSO, granular ACLs, rate limits and workers remain missing. |
 | OS-015 | Migration | Direct connector, attachments, journals, differential sync | Missing; next adoption-focused tranche. |
 
@@ -201,3 +201,9 @@ Implemented local ADOPT-03/05/06/09 slice: per-account group review and atomic b
 ## OS-045 — Private-record access handover
 
 Implemented local ADOPT-05/06/09 slice: atomic administrative handover of live private-record access, including parent-governed attachments, with rollback/concurrency/security evidence. Original record attribution and business assignments remain unchanged. Deleted-record audit policies and other visibility modes are excluded. This is a local extension, not vendor offboarding or task reassignment parity. See [cycle 20](platform-foundations.md).
+
+## Reusable application configuration — 2026-11-14
+
+Implemented bounded slices in OS-PARITY-01/02/09, with reusable case/asset/knowledge examples for OS-PARITY-04/05. [Contract and primary references](configuration.md). Existing API paths and legacy unversioned definitions retain their contracts. Configured tables enforce types and relationships through real entry points. Promotion uses destination revisions and validates affected persisted records atomically; no arbitrary code or vendor package execution is enabled.
+
+Remaining shortlist: typed metrics (OS-PARITY-07); durable delivery/connectors (03 and ADOPT-07); separate approvals/SLA timers (02); requester/field controls (08); discovery/impact (05); grounded, governed AI (06); operational restore and failover evidence (10). Whole-area statuses remain partial or missing. Exact validation results are recorded in validation.md.

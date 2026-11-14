@@ -10,6 +10,15 @@ final class Authentication {
 
     private static final String DUMMY = "pbkdf2:sha256:600000$OpenServiceDummy$" + "00".repeat(32);
 
+    static void requireCurrent(Store.Db db, Map<String, Object> user) throws java.sql.SQLException {
+        if (db.one(
+                        "SELECT user_id FROM os_user WHERE user_id=? AND active=1 AND"
+                            + " auth_revision=?",
+                        user.get("user_id"),
+                        user.get("auth_revision"))
+                == null) throw new Failure(401, "Account access changed; sign in again");
+    }
+
     static Map<String, Object> verify(Store.Db db, String name, String password, String mechanism)
             throws Exception {
         // SQLite already holds an IMMEDIATE transaction. Release this lock before business work.

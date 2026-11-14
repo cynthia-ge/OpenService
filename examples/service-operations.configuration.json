@@ -1,0 +1,140 @@
+{
+  "format": "openservice.configuration.v1",
+  "tables": {
+    "u_service_asset": {
+      "version": 0,
+      "label": "Service assets",
+      "prefix": "ASSET",
+      "fields": {
+        "short_description": "Asset name",
+        "serial_number": "Serial number",
+        "depends_on": "Depends on"
+      },
+      "states": {},
+      "flow": {},
+      "field_rules": {
+        "serial_number": {
+          "type": "string",
+          "max_length": 100
+        },
+        "depends_on": {
+          "type": "reference",
+          "target": "u_service_asset"
+        }
+      }
+    },
+    "u_service_case": {
+      "version": 0,
+      "label": "Service cases",
+      "prefix": "CASE",
+      "fields": {
+        "short_description": "Summary",
+        "description": "Description",
+        "state": "State",
+        "assigned_to": "Assignee account ID",
+        "assignment_group": "Assignment group ID",
+        "asset": "Affected asset ID",
+        "estimate": "Estimated effort",
+        "resolution": "Resolution"
+      },
+      "states": {
+        "new": "New",
+        "working": "Working",
+        "review": "Review",
+        "resolved": "Resolved"
+      },
+      "flow": {
+        "new": [
+          "working"
+        ],
+        "working": [
+          "review"
+        ],
+        "review": [
+          "working",
+          "resolved"
+        ],
+        "resolved": [
+          "working"
+        ]
+      },
+      "field_rules": {
+        "assigned_to": {
+          "type": "account"
+        },
+        "assignment_group": {
+          "type": "reference",
+          "target": "sys_user_group"
+        },
+        "asset": {
+          "type": "reference",
+          "target": "u_service_asset"
+        },
+        "estimate": {
+          "type": "decimal"
+        }
+      },
+      "assignment": {
+        "user_field": "assigned_to",
+        "group_field": "assignment_group"
+      },
+      "transition_rules": {
+        "resolved": {
+          "roles": [
+            "admin"
+          ],
+          "required_fields": [
+            "resolution"
+          ]
+        }
+      }
+    },
+    "u_service_article": {
+      "version": 0,
+      "label": "Knowledge authoring",
+      "prefix": "ARTICLE",
+      "fields": {
+        "short_description": "Title",
+        "text": "Article",
+        "state": "State"
+      },
+      "states": {
+        "draft": "Draft",
+        "review": "Review",
+        "published": "Published",
+        "retired": "Retired"
+      },
+      "flow": {
+        "draft": [
+          "review"
+        ],
+        "review": [
+          "draft",
+          "published"
+        ],
+        "published": [
+          "draft",
+          "retired"
+        ],
+        "retired": [
+          "draft"
+        ]
+      },
+      "field_rules": {
+        "text": {
+          "type": "string"
+        }
+      },
+      "transition_rules": {
+        "published": {
+          "roles": [
+            "admin"
+          ],
+          "required_fields": [
+            "text"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -156,6 +156,9 @@ public class WebController {
                                         "/api/openservice/me/password",
                                         "/api/openservice/me/sessions/revoke")
                                 .contains(path)) throw new Failure(403, "Read-only account");
+                // Configuration promotion, record writes and relationship deletion share a lock.
+                if (db.postgres) db.all("SELECT pg_advisory_xact_lock(18439,4)");
+                Authentication.requireCurrent(db, user);
             }
             var result = route(context, path, method.equals("HEAD") ? "GET" : method);
             if (result.getStatus() != null && result.getStatus().value() >= 400)
@@ -546,6 +549,27 @@ public class WebController {
             c.uniqueQuery();
             return json(map("result", Service.stats(c.db, stats.group(1), c.arguments())), 200);
         }
+        if (path.equals("/api/openservice/configuration")) {
+            method(method, "GET", "POST");
+            c.admin();
+            if (method.equals("GET")) {
+                c.noQuery();
+                disposition(c, "openservice-configuration.json");
+                return json(Configuration.export(c.db), 200);
+            }
+            if (!Set.of("dry_run").containsAll(c.arguments().keySet())
+                    || !Set.of("true", "false").contains(c.parameter("dry_run", "true")))
+                throw new Failure(400, "Use dry_run=true or false");
+            return json(
+                    map(
+                            "result",
+                            Configuration.install(
+                                    c.db,
+                                    body(c),
+                                    c.user.get("user_id").toString(),
+                                    c.parameter("dry_run", "true").equals("true"))),
+                    200);
+        }
         if (path.equals("/api/openservice/schema")) {
             method(method, "GET");
             var result = new LinkedHashMap<String, Object>();
@@ -918,6 +942,32 @@ public class WebController {
             method(method, "GET");
             return view(c, "dictionary", map("table", "dictionary"));
         }
+        if (path.equals("/admin/configuration")) {
+            method(method, "GET", "POST");
+            c.admin();
+            Map<String, Object> report = null;
+            String document = c.parameter("document", "");
+            if (method.equals("POST")) {
+                if (!Set.of("preview", "install").contains(c.parameter("operation", "")))
+                    throw new Failure(400, "Choose preview or install");
+                Object packageBody;
+                try {
+                    packageBody = JSON.readValue(document, Object.class);
+                } catch (tools.jackson.core.JacksonException invalid) {
+                    throw new Failure(400, "Enter a valid JSON configuration package");
+                }
+                report =
+                        Configuration.install(
+                                c.db,
+                                packageBody,
+                                c.user.get("user_id").toString(),
+                                c.parameter("operation", "").equals("preview"));
+            }
+            return view(
+                    c,
+                    "configuration",
+                    map("table", "configuration", "document", document, "report", report));
+        }
         if (path.equals("/admin/accounts")) return accounts(c, method);
         throw new Failure(404, "Resource not found");
     }
@@ -999,6 +1049,10 @@ public class WebController {
                         table,
                         "definition",
                         definition,
+                        "fieldRules",
+                        TypedFields.rules(definition),
+                        "emptyRule",
+                        map(),
                         "item",
                         item,
                         "data",

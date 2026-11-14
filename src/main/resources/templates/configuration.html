@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{base :: layout(~{::main})}">
+<main>
+  <section class="page-heading"><div><span class="eyebrow">REUSABLE APPLICATIONS</span><h1>Configuration packages</h1><p>Define record types, validation and workflows once, then move them between environments.</p></div><a class="button" href="/api/openservice/configuration">Download current configuration</a></section>
+  <section class="panel"><div class="panel-heading"><h2>Preview and install</h2></div>
+    <p>Preview checks table dependencies and existing records without saving changes. Installation is atomic and requires matching destination versions. New tables start at version 0.</p>
+    <div class="notice success" th:if="${report!=null}"><strong th:text="${report.dry_run ? 'Preview passed. No changes saved.' : 'Configuration installed.'}"></strong><p th:text="${'Resulting table versions: '+report.versions}"></p></div>
+    <form method="post" class="record-form"><input type="hidden" name="csrf" th:value="${csrf}">
+      <label>Configuration package JSON<textarea name="document" rows="22" required spellcheck="false" th:text="${document}"></textarea></label>
+      <p>Packages contain configuration only. Record data, users, credentials and ServiceNow update-set XML are not imported here.</p>
+      <div class="form-footer"><button class="button" name="operation" value="preview">Preview package</button><button class="button primary" name="operation" value="install">Install package</button></div>
+    </form>
+  </section>
+</main>
+</html>

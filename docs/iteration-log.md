@@ -151,3 +151,7 @@ QA round 1: found one stale historical contract expecting ORDERBYfile_name to be
 Validation: `JAVA_HOME=<Java 27> ./mvnw -q clean verify`; 278 tests pass, no skipped tests. Exact feature gate: `WebController.java`: 624/624 lines, 322/322 branches, 37/37 methods. Whole Java application: 1150/1150 lines, 644/644 branch outcomes, 90/90 methods. Reviewed scope: `src/main/java/ge/cynthia/openservice/WebController.java`, acceptance tests and supporting documentation. Production scope is reconciled against the final diff.
 
 Ordering is limited to sys_id, file_name, table_name and table_sys_id. It does not add size/content ordering, full Table query grammar, attachment updates or vendor-instance conformance. Remaining candidates include SSO/ACLs, managed schema migrations, native scripting and numeric aggregates; only this slice is implemented in this cycle.
+
+## Reusable configuration tranche — 2026-11-14
+
+Added original typed/schema configuration, reference and assignment integrity, state-entry policies, atomic versioned promotion and the administrator workspace. Bundled case/asset/knowledge definitions run through the same engines. Reviewed negative inputs, schema evolution, referential deletion, import validation, rollback, stale revisions and queued-write authorization. Full validation: 403 tests; 2359/2359 lines, 1262/1262 branches, 149/149 methods. See configuration.md and validation.md for contracts and limits.

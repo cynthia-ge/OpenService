@@ -46,6 +46,46 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void reusableServiceOperationsExampleAndQueuedWriteAuthorization() throws Exception {
+        var acceptance = new ConfigurationAcceptance(this);
+        try {
+            acceptance.exampleAndAuthorization();
+        } finally {
+            acceptance.cleanup();
+        }
+    }
+
+    @Test
+    void reusableConfigurationPackagesAndTypedRecords() throws Exception {
+        var acceptance = new ConfigurationAcceptance(this);
+        try {
+            acceptance.packagesAndRecords();
+        } finally {
+            acceptance.cleanup();
+        }
+    }
+
+    @Test
+    void configuredRelationshipsAssignmentsAndStatePolicies() throws Exception {
+        var acceptance = new ConfigurationAcceptance(this);
+        try {
+            acceptance.relationshipsAndWorkflows();
+        } finally {
+            acceptance.cleanup();
+        }
+    }
+
+    @Test
+    void configurationPermissionsPreviewAndConflicts() throws Exception {
+        var acceptance = new ConfigurationAcceptance(this);
+        try {
+            acceptance.permissionsAndConflicts();
+        } finally {
+            acceptance.cleanup();
+        }
+    }
+
+    @Test
     void bulkMembershipRemovalCountsOnlyRowsItActuallyDeletes() throws Exception {
         account("ConcurrentMember", "reader");
         String user =
@@ -138,7 +178,7 @@ abstract class WorkflowSupport {
                     0,
                     db.count(
                             "SELECT COUNT(*) FROM os_security_event WHERE"
-                                + " action='account.private_records_transferred'"));
+                                    + " action='account.private_records_transferred'"));
         }
         String api = "/api/openservice/users/" + old + "/private-records/transfer";
         try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
@@ -166,7 +206,7 @@ abstract class WorkflowSupport {
                     1,
                     db.count(
                             "SELECT COUNT(*) FROM os_security_event WHERE"
-                                + " action='account.private_records_transferred'"));
+                                    + " action='account.private_records_transferred'"));
             assertEquals(next, RecordAccess.status(db, record).get("owner_id"));
         }
     }
@@ -338,7 +378,7 @@ abstract class WorkflowSupport {
             var events =
                     db.all(
                             "SELECT * FROM os_security_event WHERE"
-                                + " action='account.private_records_transferred'");
+                                    + " action='account.private_records_transferred'");
             assertEquals(1, events.size());
             assertEquals(old, events.getFirst().get("target_id"));
             assertEquals(RecordAccess.owner(db, "admin"), events.getFirst().get("actor_id"));

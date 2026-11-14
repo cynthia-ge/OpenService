@@ -8,6 +8,27 @@ The completed platform slices provide versioned upgrades, stable identities, rev
 
 M0 remains the supported scope: a disposable local walkthrough with synthetic data. M1–M3 remain unmet. The next ready work includes complete offboarding/retention policy (ADOPT-05), requester/field visibility and inherited group roles (ADOPT-03/06), MFA/enterprise identity (ADOPT-08), and reliable verified delivery (ADOPT-07/04/05). Protected audit retention/collection and export auditing remain partial (ADOPT-09). Restore/upgrade drills, monitoring, workload evidence and named support ownership remain pilot gates. Manual bearer links do not establish verified email, enterprise identity or customer isolation.
 
+## Reusable parity baseline — 14 November 2026
+
+The current request explicitly expands implementation beyond the earlier identity-only sequencing. Shared, configurable capabilities remain industry-neutral. Inspect and update this table on later iterations; each area is a workstream, not a completed-feature claim. Existing adoption gates remain in force.
+
+| Area | Current implementation evidence and next gap |
+|---|---|
+| OS-PARITY-01 — Typed records and relationships | Partial: configurable tables, typed values, required/length/choice rules, visible record references, active-account/group assignment and deletion protection now run through API/forms/imports. Next: reference pickers/display resolution, richer types, inheritance and declarative field permissions. |
+| OS-PARITY-02 — Workflow, approvals, SLAs, notifications | Partial: reusable state machines with role-gated entry and destination-field policies; audited revision-checked changes. Next: persisted approval requests/delegation, durable jobs/outbox, schedule-aware SLA clocks and delivery. |
+| OS-PARITY-03 — Connectors and synchronization | Missing: there are bounded imports/exports, but no reusable external connector runtime, two-way correlation, conflict resolution or retry/reconciliation worker. |
+| OS-PARITY-04 — Catalogue, portal and knowledge | Partial: generic requests/knowledge records and an installable knowledge authoring workflow example. Next: requester/public visibility, catalogue offerings/fulfilment, publishing permissions and a dedicated portal. State labels do not grant publication access. |
+| OS-PARITY-05 — Assets, dependencies and events | Partial: configuration-item CRUD and configurable asset-reference relationships. Next: discovery, identification/reconciliation, event ingestion/correlation and dependency impact analysis. |
+| OS-PARITY-06 — Governed AI | Missing: no AI-provider execution, grounded assistant, policy-controlled agent tool runtime or AI evaluation/governance model. Requires permissions, dependable actions and audit foundations. |
+| OS-PARITY-07 — Analytics and process improvement | Partial: access-filtered complete-selection counts/grouping and operational workspaces. Next: typed numeric metrics, time windows/trends and permission-aware process-history analysis. |
+| OS-PARITY-08 — Identity, administration and permissions | Partial: implemented local accounts, manual invitations/recovery, session controls, groups, visibility and security journals. Next: verified durable delivery, requester/field permissions, inherited roles, MFA/SSO and provisioning. See ADOPT-03 through ADOPT-09. |
+| OS-PARITY-09 — Versioned configuration | Partial: administrator preview/install/export, per-table optimistic versions, package dependency resolution, persisted-data validation and atomic/audited promotion. Next: package history/diffs, dependency versions, controlled rollout and reversible migrations. Native ServiceNow package formats remain unsupported. |
+| OS-PARITY-10 — Operations and recovery | Partial/unverified: health probe, serialized migrations and deployment definitions exist; independently tested restore/upgrade, observability, capacity, distributed failover and support ownership remain open. |
+
+The configurable application slice maps to OS-002/006/009/013 and ADOPT-10. Its contract, operational limits and reusable sample are in [configuration](configuration.md). Acceptance requires valid/invalid types through real HTTP, persisted definitions after reopening, inaccessible/missing references, group eligibility, protected deletion, state-entry roles and required fields, schema compatibility with existing records, atomic preview/rollback, concurrent version conflict, and an administrator browser journey. Keep these boundaries separate from full ServiceNow conformance.
+
+Next ready shared-platform slices: typed numeric analytics, a durable outbox with local delivery proof, then approval records and schedule-aware SLA processing. Enterprise identity and field/requester visibility remain adoption priorities; none are waived by configuration coverage.
+
 ## Starting assessment at `9e636aa` (historical)
 
 OpenService supports a local, disposable walkthrough with synthetic data. It does not yet provide a complete invitation/onboarding system or the controls needed for an independently operated team pilot. A shared instance is not ready for real customer or employee data on the evidence currently available.
@@ -23,7 +44,7 @@ Existing controls must be preserved: password hashing, session login/logout and 
 - **Partial:** a bounded implementation exists; the named missing behavior is not covered by it.
 - **Missing:** the inspected application/configuration has no implementation of the named capability.
 - **Unverified:** configuration or functionality exists, but the required operational evidence has not been produced. This does not mean the capability is absent everywhere.
-- **Unspecified:** an evaluator/product decision is still needed. Do not invent British Telecom requirements, identity-provider details, workload targets or approvals.
+- **Unspecified:** an evaluator/product decision is still needed. Do not invent a prospective customer’s requirements, identity-provider details, workload targets or approvals.
 
 Evidence paths:
 
@@ -65,7 +86,7 @@ All P0 items are M1 prerequisites. An entry is a workstream; implementation must
 
 ## P1 — A service operation that can be adopted
 
-These are pilot/production workstreams, not claims about requirements already agreed with British Telecom. Select the precise workflow with the evaluator, but do not waive the identity, isolation, recovery or evidence gates for real-data use.
+These are pilot/production workstreams, not claims about requirements already agreed with a prospective customer. Select the precise workflow with the evaluator, but do not waive the identity, isolation, recovery or evidence gates for real-data use.
 
 | ID | Workstream and starting state | Required completion evidence |
 |---|---|---|

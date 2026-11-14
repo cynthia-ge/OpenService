@@ -1,3 +1,11 @@
+# Reusable configuration verification — 14 November 2026
+
+`JAVA_HOME=<Temurin 27.0.1.0.2+1> ./mvnw clean verify` passed **403 tests**, zero failures/errors/skips. Whole-project exact JaCoCo: **2359/2359 lines, 1262/1262 branch outcomes, 149/149 methods**. The skill's exact per-file gate passed every production Java source, without exclusions or threshold changes.
+
+SQLite and disposable PostgreSQL acceptance cover package preview/install/export, invalid schemas/values, persisted-data compatibility, failed-package rollback, concurrent revision conflicts, assignment membership, inaccessible references, protected deletion, required state fields and role-gated transitions. The checked-in service operations example is exercised directly. Reopening storage preserves definitions and records. Chromium covers configuration preview/install and typed form rejection/correction. A real PostgreSQL lock test verifies that a queued write is rejected after account access is revoked.
+
+The existing Java 27 and Spring Boot 4.1.2 pins were rechecked on 2026-11-14 against [Spring Boot requirements](https://docs.spring.io/spring-boot/system-requirements.html) and [Temurin release information](https://adoptium.net/news). No stack upgrade was needed. These are application acceptance results, not licensed ServiceNow conformance, load/failover evidence or completed adoption milestones. Historical validation follows.
+
 # Latest platform verification
 
 Cycle 20: 353 tests; 2075/2075 lines, 1104/1104 branch outcomes, 137/137 methods; zero failures/errors/skips. Real SQLite/PostgreSQL/Chromium acceptance and the exact per-file gate passed. See [platform cycle evidence](platform-foundations.md). The following earlier measurements are historical.
