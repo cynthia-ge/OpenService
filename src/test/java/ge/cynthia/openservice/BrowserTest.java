@@ -48,6 +48,48 @@ class BrowserTest {
     }
 
     @Test
+    void administratorBrowsesInactiveAccountAssignments() throws Exception {
+        String table = "u_assignment_" + id(), name = "AssignedUser" + id().substring(0, 8), user;
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db, map("name", name, "role", "agent", "password", WorkflowSupport.PASSWORD));
+            user = RecordAccess.owner(db, name);
+            AssignmentAcceptance.seed(db, table, user, 26);
+            Service.changeActive(db, RecordAccess.owner(db, "admin"), user, map("active", false));
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var context = browser.newContext()) {
+            var page = context.newPage();
+            login(page, "admin");
+            page.navigate(base() + "/admin/accounts/" + user);
+            page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName("View assigned work"))
+                    .click();
+            assertTrue(page.locator("main").innerText().contains("26 configured assignments"));
+            assertEquals(25, page.locator("tbody tr").count());
+            page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName("Next assignments"))
+                    .click();
+            assertEquals(1, page.locator("tbody tr").count());
+            page.getByRole(
+                            AriaRole.LINK,
+                            new Page.GetByRoleOptions().setName("Previous assignments"))
+                    .click();
+            page.locator("tbody a").first().click();
+            assertTrue(
+                    page.locator("input[name=short_description]")
+                            .inputValue()
+                            .startsWith("Assigned task"));
+        } finally {
+            try (var db = store.open()) {
+                db.update("DELETE FROM os_record WHERE \"table\" LIKE ?", table + "%");
+                db.update("DELETE FROM os_schema WHERE name LIKE ?", table + "%");
+                db.connection.commit();
+            }
+        }
+    }
+
+    @Test
     void managedTablesHideForbiddenMutationControls() throws Exception {
         String table = "u_managed_" + id(),
                 agentName = "ManagedAgent" + id().substring(0, 8),

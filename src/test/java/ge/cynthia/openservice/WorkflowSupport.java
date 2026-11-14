@@ -46,6 +46,11 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void administratorsCanFindAssignedWorkAcrossConfiguredTables() throws Exception {
+        AssignmentAcceptance.run(this);
+    }
+
+    @Test
     void permissionDiagnosticsMatchMutationPoliciesWithoutLeakingRecords() throws Exception {
         PermissionAcceptance.run(this);
     }

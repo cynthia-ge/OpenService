@@ -196,3 +196,9 @@ The record page provides the same append-only journey. Browser mutations require
 `GET /api/openservice/permissions/{table}/{sys_id}` reports the caller's current `role`, `record_id`, `update`, `delete` and per-field decisions under `result`. Each decision is `{"allowed":true|false,"reason":"allowed|account_role|record_roles|field_roles"}`. Account-level restrictions take precedence over table policy, then field policy. The record must already be visible; missing/inaccessible records return 404. No query parameters, subject impersonation, writes or record values are accepted/returned.
 
 This reports mutation authorization. Workflow transitions, required/type checks, reference integrity, optimistic revisions and other business validation can still reject an otherwise authorized request. An unchanged restricted field may be submitted without changing its value. Reports confer no rights, and every mutation rechecks current policy.
+
+### Assigned work during offboarding
+
+Administrators can open an account's **View assigned work** link or `GET /api/openservice/users/{user_id}/assignments?page=1`. The API returns `{result:{account,records,page,pages,total}}`; each record contains only `sys_id`, `table`, `number` and `summary`. Pages contain at most 25 rows, ordered by table then ID. `page` defaults to 1 and must be positive, at most six digits and within the result range (an empty list has one page). Other/duplicate query parameters fail with 400.
+
+The directory scans installed `assignment.user_field` metadata across tables and matches stable account IDs, including inactive assignees. Arbitrary legacy text fields and private-access ownership are not treated as work assignments. Other roles receive 403; missing users receive 404. Reads do not reactivate users, alter assignments or change record visibility.

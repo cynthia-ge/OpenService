@@ -752,6 +752,19 @@ public class WebController {
                     ? json(map("result", map("revoked", true)), 200)
                     : redirect("/admin/accounts/" + recoveryRevoke.group(1));
         }
+        Matcher assignments =
+                Pattern.compile(
+                                "/(?:admin/accounts|api/openservice/users)/([0-9a-f]{32})/assignments")
+                        .matcher(path);
+        if (assignments.matches()) {
+            method(method, "GET");
+            c.admin();
+            c.uniqueQuery();
+            var report = Assignments.page(c.db, assignments.group(1), c.arguments());
+            if (path.startsWith("/api/")) return json(map("result", report), 200);
+            report.put("table", "accounts");
+            return view(c, "assignments", report);
+        }
         Matcher transferPrivate =
                 Pattern.compile(
                                 "/(?:admin/accounts|api/openservice/users)/([0-9a-f]{32})/private-records/transfer")

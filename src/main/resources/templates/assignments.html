@@ -1,0 +1,8 @@
+<!doctype html><html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{base :: layout(~{::main})}"><main>
+<a class="back-link" th:href="@{/admin/accounts/{id}(id=${account.user_id})}">← Account</a>
+<section class="page-heading"><div><span class="eyebrow">WORK CONTINUITY</span><h1 th:text="${'Assigned work for '+account.name}"></h1><p th:text="${total+' configured assignments. Private access ownership is managed separately.'}"></p></div></section>
+<section class="panel"><div class="table-scroll"><table><thead><tr><th>Table</th><th>Record</th><th>Summary</th></tr></thead><tbody>
+<tr th:each="record:${records}"><td th:text="${record.table}"></td><td><a th:href="@{/record/{table}/{id}(table=${record.table},id=${record.sys_id})}" th:text="${record.number}"></a></td><td th:text="${record.summary}"></td></tr>
+<tr th:if="${records.isEmpty()}"><td colspan="3">No configured assignments.</td></tr></tbody></table></div>
+<div class="form-footer"><a th:if="${page>1}" th:href="@{/admin/accounts/{id}/assignments(id=${account.user_id},page=${page-1})}">Previous assignments</a><span th:text="${'Page '+page+' of '+pages}"></span><a th:if="${page<pages}" th:href="@{/admin/accounts/{id}/assignments(id=${account.user_id},page=${page+1})}">Next assignments</a></div></section>
+</main></html>
