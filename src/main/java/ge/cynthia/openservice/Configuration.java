@@ -101,6 +101,7 @@ final class Configuration {
                                 "flow",
                                 "field_rules",
                                 "transition_rules",
+                                "record_roles",
                                 "assignment")
                         .containsAll(definition.keySet()),
                 "Unsupported table configuration property");
@@ -183,6 +184,11 @@ final class Configuration {
             if (rule.containsKey("required_fields"))
                 choices(rule.get("required_fields"), fields.keySet());
         }
+        var recordRoles = object(definition.getOrDefault("record_roles", map()));
+        require(
+                Set.of("create", "update", "delete").containsAll(recordRoles.keySet()),
+                "Unsupported record operation");
+        for (Object roles : recordRoles.values()) choices(roles, Set.of("admin", "agent"));
         var assignment = object(definition.getOrDefault("assignment", map()));
         if (!assignment.isEmpty()) {
             require(

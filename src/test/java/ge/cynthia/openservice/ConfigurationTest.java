@@ -14,6 +14,12 @@ class ConfigurationTest {
     @TestFactory
     Stream<DynamicTest> rejectsMalformedDefinitionsBeforeTheyReachStorage() {
         var cases = new LinkedHashMap<String, Consumer<Map<String, Object>>>();
+        cases.put(
+                "unknown record operation",
+                d -> d.put("record_roles", map("execute", List.of("admin"))));
+        cases.put("invalid record roles", d -> d.put("record_roles", map("create", "admin")));
+        cases.put(
+                "unknown record role", d -> d.put("record_roles", map("update", List.of("root"))));
         cases.put("unknown property", d -> d.put("script", "unsafe"));
         cases.put("missing version", d -> d.remove("version"));
         cases.put("negative version", d -> d.put("version", -1));

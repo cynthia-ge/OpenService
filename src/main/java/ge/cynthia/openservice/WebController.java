@@ -901,6 +901,9 @@ public class WebController {
                             page.total(),
                             "offset",
                             page.offset(),
+                            "canCreateRecord",
+                            !c.role().equals("reader")
+                                    && RecordPolicy.allows(definition, "create", c.role()),
                             "overview",
                             path.equals("/"),
                             "search",
@@ -1100,6 +1103,10 @@ public class WebController {
                         table,
                         "definition",
                         definition,
+                        "canWriteRecord",
+                        !c.role().equals("reader")
+                                && RecordPolicy.allows(
+                                        definition, item == null ? "create" : "update", c.role()),
                         "fieldRules",
                         TypedFields.rules(definition),
                         "emptyRule",

@@ -93,6 +93,7 @@ public final class Service {
     public static Map<String, Object> create(Store.Db db, String table, Object body, String actor)
             throws SQLException {
         var definition = schema(db, table);
+        RecordPolicy.require(definition, "create", db.viewerRole);
         var payload = object(body);
         validate(definition, payload);
         if (((String) payload.getOrDefault("short_description", "")).isBlank())
@@ -199,6 +200,7 @@ public final class Service {
             String revision)
             throws SQLException {
         var definition = schema(db, table);
+        RecordPolicy.require(definition, "update", role);
         var payload = object(body);
         validate(definition, payload);
         var data = object(item.get("data"));
@@ -240,6 +242,7 @@ public final class Service {
 
     public static void remove(Store.Db db, Map<String, Object> item, String actor)
             throws SQLException {
+        RecordPolicy.require(schema(db, item.get("table").toString()), "delete", db.viewerRole);
         TypedFields.deleting(db, item);
         audit(db, item, actor, "deleted", map("before", serialize(item)));
         db.update("DELETE FROM os_attachment WHERE record_id=?", item.get("sys_id"));
@@ -559,6 +562,7 @@ public final class Service {
             Store.Db db, String table, Object body, String actor, boolean dryRun)
             throws SQLException {
         var definition = schema(db, table);
+        RecordPolicy.require(definition, "create", db.viewerRole);
         Object input = body instanceof Map<?, ?> wrapper ? wrapper.get("result") : body;
         if (!(input instanceof List<?> rows) || rows.size() > 10000)
             throw new Failure(400, "Import a result array or list with at most 10000 records");

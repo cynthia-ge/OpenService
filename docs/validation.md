@@ -57,3 +57,5 @@ Cycle 2: 409 passing tests; exact Java line/branch/method counts 2,431/2,431; 1,
 Cycle 3: 411 passing tests; exact Java line/branch/method counts 2,454/2,454; 1,316/1,316; 160/160.
 
 Cycle 4: 415 passing tests; exact Java line/branch/method counts 2,467/2,467; 1,326/1,326; 161/161.
+
+Cycle 5: 421 passing tests; exact Java line/branch/method counts 2,485/2,485; 1,344/1,344; 163/163.

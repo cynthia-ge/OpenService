@@ -48,6 +48,75 @@ class BrowserTest {
     }
 
     @Test
+    void managedTablesHideForbiddenMutationControls() throws Exception {
+        String table = "u_managed_" + id(),
+                agentName = "ManagedAgent" + id().substring(0, 8),
+                record;
+        try (var db = store.open()) {
+            Service.createAccount(
+                    db,
+                    map("name", agentName, "role", "agent", "password", WorkflowSupport.PASSWORD));
+            db.viewerRole = "admin";
+            db.viewerId = RecordAccess.owner(db, "admin");
+            var definition = ConfigurationAcceptance.definition();
+            definition.put(
+                    "record_roles",
+                    map(
+                            "create",
+                            List.of("admin"),
+                            "update",
+                            List.of("admin"),
+                            "delete",
+                            List.of()));
+            Configuration.install(
+                    db, ConfigurationAcceptance.bundle(table, definition), db.viewerId, false);
+            record =
+                    Service.create(db, table, map("short_description", "Managed record"), "admin")
+                            .get("sys_id")
+                            .toString();
+            db.connection.commit();
+        }
+        try (var playwright = Playwright.create();
+                var browser = playwright.chromium().launch();
+                var context = browser.newContext()) {
+            var page = context.newPage();
+            login(page, agentName);
+            page.navigate(base() + "/workspace/" + table);
+            assertEquals(
+                    0,
+                    page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName("New record"))
+                            .count());
+            page.navigate(base() + "/record/" + table + "/" + record);
+            assertNotNull(page.locator("input[name=short_description]").getAttribute("readonly"));
+            assertEquals(
+                    0,
+                    page.getByRole(
+                                    AriaRole.BUTTON,
+                                    new Page.GetByRoleOptions().setName("Save changes"))
+                            .count());
+            assertEquals(
+                    1,
+                    page.getByRole(
+                                    AriaRole.BUTTON,
+                                    new Page.GetByRoleOptions().setName("Post comment"))
+                            .count());
+            page.navigate(base() + "/record/" + table + "/new");
+            assertEquals(
+                    0,
+                    page.getByRole(
+                                    AriaRole.BUTTON,
+                                    new Page.GetByRoleOptions().setName("Create record"))
+                            .count());
+        } finally {
+            try (var db = store.open()) {
+                db.update("DELETE FROM os_record WHERE \"table\"=?", table);
+                db.update("DELETE FROM os_schema WHERE name=?", table);
+                db.connection.commit();
+            }
+        }
+    }
+
+    @Test
     void administratorPreviewsInstallsAndUsesAReusableTypedApplication() throws Exception {
         String table = "u_browser_" + id();
         try (var playwright = Playwright.create();

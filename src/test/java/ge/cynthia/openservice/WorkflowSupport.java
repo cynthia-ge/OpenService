@@ -46,6 +46,11 @@ abstract class WorkflowSupport {
     }
 
     @Test
+    void configuredRecordOperationsConstrainExistingRoles() throws Exception {
+        RecordPolicyAcceptance.run(this);
+    }
+
+    @Test
     void fieldWritePoliciesCoverFormsApiAndImports() throws Exception {
         FieldPolicyAcceptance.run(this);
     }
